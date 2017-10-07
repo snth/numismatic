@@ -7,7 +7,51 @@ import attr
 
 from .events import Heartbeat, Trade
 
+
 logger = logging.getLogger(__name__)
+
+
+@attr.s
+class LunoExchange:
+    '''Websocket client for the Luno Exchange
+
+    '''
+    wss_url = 'wss://ws.luno.com/api/1/stream'
+    exchange = 'Luno'
+
+    output_stream = attr.ib()
+
+
+    async def listen(self, symbol):
+        ws = await self._subscribe(symbol)
+        channel_info = await self._subscribe(ws, symbol)
+        while True:
+            try:
+                packet = await ws.recv()
+                msg = self._handle_packet(packet, symbol)
+            except asyncio.CancelledError:
+                ## unsubscribe
+                confirmation = await self._unsubscribe(ws, channel_info)
+
+    @classmethod
+    async def _subscribe(cls, symbol):
+        wss_url = f'{cls.wss_url}/{symbol}'
+        logger.info(f'Connecting to {wss_url} ...')
+        ws = await websockets.connect(wss_url)
+        packet = await ws.recv()
+        initial_order_book = json.loads(packet)
+        logger.info(initial_order_book)
+        return ws
+
+    @classmethod
+    async def _unsubscribe(cls, symbol):
+        return True
+
+    def _handle_packet(self, packet, symbol):
+        msg = json.loads(packet)
+        self.output_stream.emit(msg)
+        return msg
+
 
 
 @attr.s
@@ -33,14 +77,14 @@ class BitfinexExchange:
         logger.info(connection_status)
         return ws
 
-
     @staticmethod
     async def _ping_pong(ws):
-            # try ping-pong
-            msg = json.dumps({'event':'ping'})
-            await ws.send(msg)
-            pong = await ws.recv()
-            return pong
+        'Simple ping pong for testing the connection'
+        # try ping-pong
+        msg = json.dumps({'event':'ping'})
+        await ws.send(msg)
+        pong = await ws.recv()
+        return pong
 
     async def listen(self, symbol, channel='trades'):
         ws = await self._connect()
@@ -116,3 +160,21 @@ class BitfinexExchange:
             raise NotImplementedError(msg)
         return msg
 
+
+if __name__=='__main__':
+    # Simple example of how these should be used
+    logging.basicConfig(level=logging.INFO)
+    from streamz import Stream
+    output_stream = Stream()
+    printer = output_stream.map(print)
+
+    bfx = BitfinexExchange(output_stream=output_stream)
+    bfx_btc = bfx.listen('BTCUSD', 'trades')
+    luno = LunoExchange(output_stream=output_stream)
+    luno_btc = luno.listen('XBTZAR')
+
+    loop = asyncio.get_event_loop()
+    future = asyncio.wait([luno_btc], timeout=15)
+    completed, pending = loop.run_until_complete(future)
+    for task in pending:
+        task.cancel()

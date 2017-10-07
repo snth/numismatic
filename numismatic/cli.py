@@ -171,6 +171,7 @@ def listen(state, exchange, assets, currencies, channel):
 @pass_state
 def collect(state, filter, type, output, format):
     'Collect events and write them to an output sink'
+    # TODO: The filter logic here should be moved to the collectors module
     output_stream = state['output_stream']
     if type:
         output_stream = output_stream.filter(
@@ -192,6 +193,9 @@ def collect(state, filter, type, output, format):
 @pass_state
 def run(state, timeout):
     'Run the asyncio event loop for a set amount of time'
+    if not timeout:
+        # Allow to run indefinitely if timeout==0
+        timeout = None
     subscriptions = state['subscriptions']
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
@@ -212,4 +216,6 @@ def write(data, file, sep='\n'):
 
 
 if __name__ == '__main__':
+    # TODO: Check the click docs if the auto_envvars_prefix can be set
+    #       elsewhere.
     coin(auto_envvars_prefix=f'{ENVVAR_PREFIX}')
