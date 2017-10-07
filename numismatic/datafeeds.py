@@ -4,6 +4,7 @@ import math
 import time
 from datetime import datetime, timedelta
 from dateutil.parser import parse
+import abc
 
 from pathlib import Path
 import asyncio
@@ -54,6 +55,7 @@ def _validate_dates(start_date, end_date, freq):
 
 class Datafeed:
     "Base class"
+    # TODO: make this an ABC
 
     @classmethod
     def factory(cls, feed_name, *args, **kwargs):
@@ -63,6 +65,8 @@ class Datafeed:
         feed_name = feed_name.lower()
         if feed_name=='cryptocompare':
             collector = CryptoCompare(*args, **kwargs)
+        elif feed_name=='luno':
+            collector = Luno(*args, **kwargs)
         else:
             raise NotImplementedError(f'feed_name: {feed_name}')
         return collector
@@ -76,7 +80,32 @@ class Datafeed:
 
     def _make_request(self, api_url, params=None):
         response = self.requester.get(api_url, params=params)
-        return response
+        data = response.json()
+        return data
+
+
+class Luno(Datafeed):
+
+    api_url = 'https://api.mybitx.com/api/1/'
+
+    def get_list(self):
+        api_url = f'{self.api_url}/tickers'
+        data = self._make_request(api_url)
+        tickers = data['tickers']
+        return [ticker['pair'] for ticker in tickers]
+
+    def get_info(self, assets):
+        raise NotImplementedError('Not available for this feed.') 
+
+    def get_prices(self, coins, currencies):
+        api_url = f'{self.api_url}/tickers'
+        data = self._make_request(api_url)
+        tickers = data['tickers']
+        coins = coins.upper().split(',')
+        currencies = currencies.upper().split(',')
+        pairs = {f'{coin}{currency}' for coin, currency in 
+                 product(coins, currencies)}
+        return [ticker for ticker in tickers if ticker['pair'] in pairs]
 
 
 class CryptoCompare(Datafeed):
@@ -92,6 +121,17 @@ class CryptoCompare(Datafeed):
 
     def __init__(self, requester='basic', cache_dir=None):
         super().__init__(requester=requester, cache_dir=cache_dir)
+
+    def get_list(self):
+        api_url = f'{self.base_url}/coinlist'
+        coinlist = self._make_request(api_url)
+        return coinlist.keys()
+
+    def get_info(self, assets):
+        api_url = f'{self.base_url}/coinlist'
+        coinlist = self._make_request(api_url)
+        assets_info = [coinlist[a] for a in assets]
+        return assets_info
 
     def get_prices(self, coins, currencies):
         coins = coins.upper().split(',')
@@ -135,10 +175,6 @@ class CryptoCompare(Datafeed):
             data.extend(chunk)
         return data
 
-    def get_list(self):
-        api_url = f'{self.base_url}/coinlist'
-        return self._make_request(api_url)
-
     def get_latest_price(self, fsym, tsyms):
         api_url = f'{self.api_url}/price'
         tsyms = make_list_str(tsyms)
@@ -173,8 +209,7 @@ class CryptoCompare(Datafeed):
         return self._make_request(api_url, params)
 
     def _make_request(self, api_url, params=None):
-        response = super()._make_request(api_url, params)
-        data = response.json()
+        data = super()._make_request(api_url, params)
         if 'Data' in data:
             data = data['Data']
         return data

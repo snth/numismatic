@@ -17,8 +17,8 @@ ENVVAR_PREFIX = 'NUMISMATIC'
 pass_state = click.make_pass_decorator(dict, ensure=True)
 
 @click.group(chain=True)
-@click.option('--feed', '-f', default='CryptoCompare',
-              type=click.Choice(['CryptoCompare', 'BFXData']))
+@click.option('--feed', '-f', default='cryptocompare',
+              type=click.Choice(['cryptocompare', 'luno']))
 @click.option('--cache-dir', '-d', default=None)
 @click.option('--requester', '-r', default='caching',
               type=click.Choice(['base', 'caching']))
@@ -40,6 +40,8 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin prices
 
         coin prices -a XMR,ZEC -c EUR,ZAR
+
+        coin -f luno prices -a XBT -c ZAR
 
         NUMISMATIC_CURRENCIES=ZAR coin prices
 
@@ -65,7 +67,7 @@ def coin(state, feed, cache_dir, requester, log_level):
 def list_all(state, output):
     "List all available assets"
     datafeed = state['datafeed']
-    assets_list = datafeed.get_list().keys()
+    assets_list = datafeed.get_list()
     write(assets_list, output, sep=' ')
 
 @coin.command()
@@ -77,8 +79,7 @@ def info(state, assets, output):
     "Info about the requested assets"
     assets = ','.join(assets).split(',')
     datafeed = state['datafeed']
-    all_info = datafeed.get_list()
-    assets_info = [all_info[a] for a in assets]
+    assets_info = datafeed.get_info(assets)
     write(assets_info, output)
 
 
