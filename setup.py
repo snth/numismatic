@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 
 from pathlib import Path
-from setuptools import setup
+from setuptools import setup, find_packages
 
 README = Path('README.rst').open('rt').read()
 REQUIREMENTS = Path('requirements.txt').open('rt').read().strip().split('\n')
-print(REQUIREMENTS)
 VERSION = open(Path('VERSION')).read().strip()
-print(VERSION)
 
 setup(name='numismatic',
       version=VERSION,
@@ -17,7 +15,10 @@ setup(name='numismatic',
       maintainer_email='Tobias.Brandt@gmail.com',
       license='MIT',
       keywords='bitcoin,ethereum,cryptocurrencies',
-      packages=['numismatic'],
+      packages=find_packages(),
+      package_data={
+          '': ['*.txt', '*.md', '*.rst', 'VERSION'],
+          },
       long_description=README,
       install_requires=REQUIREMENTS,
       python_requires='>=3.6',
