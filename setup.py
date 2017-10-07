@@ -21,7 +21,7 @@ setup(name='numismatic',
       long_description=README,
       install_requires=REQUIREMENTS,
       python_requires='>=3.6',
-      zip_safe=True,
+      zip_safe=False,
       entry_points='''
           [console_scripts]
           coin=numismatic.cli:coin
