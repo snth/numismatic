@@ -1,6 +1,5 @@
 appdirs
 attrs
-bitex
 click
 python-dateutil
 requests
