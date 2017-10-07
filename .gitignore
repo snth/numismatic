@@ -1,6 +1,7 @@
 .ipynb_checkpoints
 __pycache__
 *.swp
+*.swo
 *.egg-info
 *~
 venv-numismatic/
