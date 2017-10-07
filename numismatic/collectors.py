@@ -2,7 +2,7 @@ import logging
 from itertools import product, chain
 import math
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.parser import parse
 
 from pathlib import Path
@@ -18,6 +18,15 @@ def make_list_str(items):
         items = items.split(',')
     return ','.join(items)
 
+def date_range(start_date, end_date, delta):
+    dates = []
+
+    while end_date > start_date:
+        dates.insert(0, end_date)
+        end_date -= delta
+    
+    dates.insert(0, start_date)
+    return dates
 
 class CoinCollector:
     "Base class"
@@ -52,9 +61,9 @@ class CoinCollector:
     @staticmethod
     def to_datetime(datelike, origin=None):
         if datelike is None:
-            date = datetime.now()
+            return datetime.now()
         elif isinstance(datelike, str):
-            date = parse(datelike)
+            return parse(datelike)
         else:
             raise TypeError(f'{datelike}')
 
@@ -63,11 +72,11 @@ class CoinCollector:
         freqmap = dict(d='days', h='hours', m='minutes', s='seconds',
                        ms='milliseconds', us='microseconds')
         freqstr = freqmap[freq]
-        end_date = self.to_datetime(end_date)
+        end_date = CoinCollector.to_datetime(end_date)
         if isinstance(start_date, int):
             start_date = end_date + timedelta(**{freqstr:start_date})
         else:
-            start_date = self.to_datetime(start_date)
+            start_date = CoinCollector.to_datetime(start_date)
         interval_time = timedelta(**{freqstr:1})
         intervals = math.ceil((end_date-start_date)/interval_time)
         return start_date, end_date, freqstr, intervals
@@ -104,11 +113,7 @@ class CryptoCompare(CoinCollector):
         start_date, end_date, freqstr, intervals = \
             self._validate_dates(start_date, end_date, freq)
         limit = min(intervals, self._interval_limit)
-        dates = []
-        while end_date>start_date:
-            dates.insert(0, end_date)
-            end_date -= timedelta(**{freqstr:limit})
-        dates.insert(0, start_date)
+        dates = date_range(start_date, end_date, timedelta(**{freqstr:limit}))
 
         data = []
         for start, end in zip(dates[:-1], dates[1:]):
