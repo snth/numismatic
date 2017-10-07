@@ -1,5 +1,6 @@
 .ipynb_checkpoints
-__pycache__
+__pycache__/
+dist/
 *.swp
 *.swo
 *.egg-info

@@ -6,9 +6,8 @@ click==6.7
 HeapDict==1.0.0
 idna==2.6
 python-dateutil==2.6.1
-pytz==2017.2
 requests==2.18.4
-six==1.10.0
+six==1.11.0
 streamz==0.1.0
 toolz==0.8.2
 tornado==4.5.2
