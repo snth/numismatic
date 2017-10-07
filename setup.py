@@ -21,10 +21,10 @@ setup(name='numismatic',
       packages=['numismatic'],
       long_description=README,
       install_requires=REQUIREMENTS,
+      python_requires='>=3.6',
       zip_safe=False,
       entry_points='''
           [console_scripts]
-          numisma=numismatic.cli:numisma
           coin=numismatic.cli:numisma
           '''
       )
