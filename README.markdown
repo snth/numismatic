@@ -1,8 +1,6 @@
 # Numismatic - Coin Collecting for Digital Assets
 
-[![Join the chat at 
-https://gitter.im/numismatic-chat/Lobby](https://badges.gitter.im/numismatic-chat/Lobby.svg)]
-(https://gitter.im/numismatic-chat/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) 
+[![Join the chat at https://gitter.im/numismatic-chat/Lobby](https://badges.gitter.im/numismatic-chat/Lobby.svg)](https://gitter.im/numismatic-chat/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) 
 
 ## Getting started
 
