@@ -14,6 +14,7 @@ from .requesters import Requester
 logger = logging.getLogger(__name__)
 
 
+# TODO: move the utility functions to lib module
 def make_list_str(items):
     if isinstance(items, str):
         items = items.split(',')
@@ -53,9 +54,8 @@ def _validate_dates(start_date, end_date, freq):
     return start_date, end_date, freqstr, intervals
 
 
-class Datafeed:
+class Datafeed(abc.ABC):
     "Base class"
-    # TODO: make this an ABC
 
     @classmethod
     def factory(cls, feed_name, *args, **kwargs):
@@ -63,13 +63,11 @@ class Datafeed:
             raise TypeError(f'"feed_name" must be a str. '
                             'Not {type(feed_name)}.')
         feed_name = feed_name.lower()
-        if feed_name=='cryptocompare':
-            collector = CryptoCompare(*args, **kwargs)
-        elif feed_name=='luno':
-            collector = Luno(*args, **kwargs)
-        else:
-            raise NotImplementedError(f'feed_name: {feed_name}')
-        return collector
+        subclasses = {subcls.__name__.lower():subcls for subcls in 
+                      cls.__subclasses__()}
+        subclass = subclasses[feed_name]
+        feed = subclass(*args, **kwargs)
+        return feed
 
     def __init__(self, requester='base', cache_dir=None):
         # TODO: Use attrs here
@@ -82,6 +80,18 @@ class Datafeed:
         response = self.requester.get(api_url, params=params)
         data = response.json()
         return data
+
+    @abc.abstractmethod
+    def get_list(self):
+        return
+
+    @abc.abstractmethod
+    def get_info(self, assets):
+        return
+
+    @abc.abstractmethod
+    def get_prices(self, assets, currencies):
+        return
 
 
 class Luno(Datafeed):
