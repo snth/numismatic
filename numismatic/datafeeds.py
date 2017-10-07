@@ -140,6 +140,7 @@ class CryptoCompare(Datafeed):
     def get_info(self, assets):
         api_url = f'{self.base_url}/coinlist'
         coinlist = self._make_request(api_url)
+        assets = assets.upper().split(',')
         assets_info = [coinlist[a] for a in assets]
         return assets_info
 
@@ -223,3 +224,14 @@ class CryptoCompare(Datafeed):
         if 'Data' in data:
             data = data['Data']
         return data
+
+
+if __name__=='__main__':
+    luno = Luno()
+    print(luno.get_list())
+    print(luno.get_prices('XBT', 'ZAR'))
+    cc = CryptoCompare()
+    print(cc.get_list())
+    print(cc.get_info('BTC,ETH'))
+    print(cc.get_prices('BTC,ETH', 'USD,EUR'))
+    print(cc.get_historical_data('BTC,ETH', 'USD,EUR'))
