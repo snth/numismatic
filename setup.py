@@ -25,6 +25,6 @@ setup(name='numismatic',
       zip_safe=False,
       entry_points='''
           [console_scripts]
-          coin=numismatic.cli:numisma
+          coin=numismatic.cli:coin
           '''
       )

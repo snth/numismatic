@@ -26,7 +26,7 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
               type=click.Choice(['debug', 'info', 'warning', 'error',
                                  'critical']))
 @pass_state
-def numisma(state, feed, cache_dir, requester, log_level):
+def coin(state, feed, cache_dir, requester, log_level):
     '''Numismatic Command Line Interface
 
     Examples:
@@ -59,7 +59,7 @@ def numisma(state, feed, cache_dir, requester, log_level):
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
 
-@numisma.command(name='list')
+@coin.command(name='list')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
 def list_all(state, output):
@@ -68,7 +68,7 @@ def list_all(state, output):
     assets_list = datafeed.get_list().keys()
     write(assets_list, output, sep=' ')
 
-@numisma.command()
+@coin.command()
 @click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
@@ -82,7 +82,7 @@ def info(state, assets, output):
     write(assets_info, output)
 
 
-@numisma.command()
+@coin.command()
 @click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
@@ -98,7 +98,7 @@ def prices(state, assets, currencies, output):
     write(prices, output)
 
 
-@numisma.command()
+@coin.command()
 @click.option('--freq', '-f', default='d', type=click.Choice(list('dhms')))
 @click.option('--start-date', '-s', default=-30)
 @click.option('--end-date', '-e', default=None)
@@ -134,7 +134,7 @@ def tabulate(data):
     return map(lambda d: DataTuple(**d), data_iter)
 
 
-@numisma.command()
+@coin.command()
 @click.option('--exchange', '-e', default='bitfinex',
               type=click.Choice(['bitfinex', 'bitstamp', 'gdax', 'gemini',
                                  'poloniex']))
@@ -161,7 +161,7 @@ def listen(state, exchange, assets, currencies, channel):
        raise NotImplementedError()
  
 
-@numisma.command()
+@coin.command()
 @click.option('--filter', '-f', default='', type=str, multiple=True)
 @click.option('--type', '-t', default=None,
               type=click.Choice([None, 'Trade', 'Heartbeat']))
@@ -187,7 +187,7 @@ def collect(state, filter, type, output, format):
             )
 
 
-@numisma.command()
+@coin.command()
 @click.option('--timeout', '-t', default=15)
 @pass_state
 def run(state, timeout):
@@ -212,4 +212,4 @@ def write(data, file, sep='\n'):
 
 
 if __name__ == '__main__':
-    numisma(auto_envvars_prefix=f'{ENVVAR_PREFIX}')
+    coin(auto_envvars_prefix=f'{ENVVAR_PREFIX}')
