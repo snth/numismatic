@@ -28,6 +28,30 @@ def date_range(start_date, end_date, delta):
     dates.insert(0, start_date)
     return dates
 
+
+def to_datetime(datelike, origin=None):
+    if datelike is None:
+        return datetime.now()
+    elif isinstance(datelike, str):
+        return parse(datelike)
+    else:
+        raise TypeError(f'{datelike}')
+
+
+def _validate_dates(start_date, end_date, freq):
+    freqmap = dict(d='days', h='hours', m='minutes', s='seconds',
+                    ms='milliseconds', us='microseconds')
+    freqstr = freqmap[freq]
+    end_date = to_datetime(end_date)
+    if isinstance(start_date, int):
+        start_date = end_date + timedelta(**{freqstr:start_date})
+    else:
+        start_date = to_datetime(start_date)
+    interval_time = timedelta(**{freqstr:1})
+    intervals = math.ceil((end_date-start_date)/interval_time)
+    return start_date, end_date, freqstr, intervals
+
+
 class Datafeed:
     "Base class"
 
@@ -53,29 +77,6 @@ class Datafeed:
     def _make_request(self, api_url, params=None):
         response = self.requester.get(api_url, params=params)
         return response
-
-    @staticmethod
-    def to_datetime(datelike, origin=None):
-        if datelike is None:
-            return datetime.now()
-        elif isinstance(datelike, str):
-            return parse(datelike)
-        else:
-            raise TypeError(f'{datelike}')
-
-    @staticmethod
-    def _validate_dates(start_date, end_date, freq):
-        freqmap = dict(d='days', h='hours', m='minutes', s='seconds',
-                       ms='milliseconds', us='microseconds')
-        freqstr = freqmap[freq]
-        end_date = Datafeed.to_datetime(end_date)
-        if isinstance(start_date, int):
-            start_date = end_date + timedelta(**{freqstr:start_date})
-        else:
-            start_date = Datafeed.to_datetime(start_date)
-        interval_time = timedelta(**{freqstr:1})
-        intervals = math.ceil((end_date-start_date)/interval_time)
-        return start_date, end_date, freqstr, intervals
 
 
 class CryptoCompare(Datafeed):
@@ -107,7 +108,7 @@ class CryptoCompare(Datafeed):
         coin = coin.upper()
         currency = currency.upper()
         start_date, end_date, freqstr, intervals = \
-            self._validate_dates(start_date, end_date, freq)
+            _validate_dates(start_date, end_date, freq)
         limit = min(intervals, self._interval_limit)
         dates = date_range(start_date, end_date, timedelta(**{freqstr:limit}))
 
