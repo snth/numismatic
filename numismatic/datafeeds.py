@@ -107,14 +107,14 @@ class Luno(Datafeed):
     def get_info(self, assets):
         raise NotImplementedError('Not available for this feed.') 
 
-    def get_prices(self, coins, currencies):
+    def get_prices(self, assets, currencies):
         api_url = f'{self.api_url}/tickers'
         data = self._make_request(api_url)
         tickers = data['tickers']
-        coins = coins.upper().split(',')
+        assets = assets.upper().split(',')
         currencies = currencies.upper().split(',')
-        pairs = {f'{coin}{currency}' for coin, currency in 
-                 product(coins, currencies)}
+        pairs = {f'{asset}{currency}' for asset, currency in 
+                 product(assets, currencies)}
         return [ticker for ticker in tickers if ticker['pair'] in pairs]
 
 
@@ -143,19 +143,19 @@ class CryptoCompare(Datafeed):
         assets_info = [coinlist[a] for a in assets]
         return assets_info
 
-    def get_prices(self, coins, currencies):
-        coins = coins.upper().split(',')
+    def get_prices(self, assets, currencies):
+        assets = assets.upper().split(',')
         currencies = currencies.upper().split(',')
         # FIXME: SHouldn't use caching
-        data = self.get_latest_price_multi(coins, currencies)
-        prices = [{'coin':coin, 'currency':currency, 'price':price}
-                  for coin, coin_prices in data.items()
-                  for currency, price in coin_prices.items()]
+        data = self.get_latest_price_multi(assets, currencies)
+        prices = [{'asset':asset, 'currency':currency, 'price':price}
+                  for asset, asset_prices in data.items()
+                  for currency, price in asset_prices.items()]
         return prices
 
-    def get_historical_data(self, coin, currency, freq='d', end_date=None,
+    def get_historical_data(self, asset, currency, freq='d', end_date=None,
                             start_date=-30, exchange=None):
-        coin = coin.upper()
+        asset = asset.upper()
         currency = currency.upper()
         start_date, end_date, freqstr, intervals = \
             _validate_dates(start_date, end_date, freq)
@@ -166,19 +166,19 @@ class CryptoCompare(Datafeed):
         for start, end in zip(dates[:-1], dates[1:]):
             toTs = math.ceil(end.timestamp())
             limit = math.ceil((end-start)/timedelta(**{freqstr:1}))
-            logger.debug(f'Getting {coin}/{currency} for {limit}{freqstr} to {end}')
+            logger.debug(f'Getting {asset}/{currency} for {limit}{freqstr} to {end}')
             time.sleep(1/4)   # max 4 requests per second
             if freq.startswith('m'):
                 chunk = self.get_historical_minute(
-                    fsym=coin, tsym=currency, e=exchange, limit=limit,
+                    fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             elif freq.startswith('h'):
                 chunk = self.get_historical_hour(
-                    fsym=coin, tsym=currency, e=exchange, limit=limit,
+                    fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             elif freq.startswith('d'):
                 chunk = self.get_historical_day(
-                    fsym=coin, tsym=currency, e=exchange, limit=limit,
+                    fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             else:
                 raise NotImplementedError(f'freq={freq}')

@@ -95,7 +95,7 @@ def prices(state, assets, currencies, output):
     assets = ','.join(assets)
     currencies = ','.join(currencies)
     datafeed = state['datafeed']
-    prices = datafeed.get_prices(coins=assets, currencies=currencies)
+    prices = datafeed.get_prices(assets=assets, currencies=currencies)
     write(prices, output)
 
 
