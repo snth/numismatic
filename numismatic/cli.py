@@ -17,7 +17,7 @@ ENVVAR_PREFIX = 'NUMISMATIC'
 pass_state = click.make_pass_decorator(dict, ensure=True)
 
 @click.group(chain=True)
-@click.option('--collector', '-c', default='CryptoCompare',
+@click.option('--feed', '-f', default='CryptoCompare',
               type=click.Choice(['CryptoCompare', 'BFXData']))
 @click.option('--cache-dir', '-d', default=None)
 @click.option('--requester', '-r', default='caching',
@@ -26,7 +26,7 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
               type=click.Choice(['debug', 'info', 'warning', 'error',
                                  'critical']))
 @pass_state
-def numisma(state, collector, cache_dir, requester, log_level):
+def numisma(state, feed, cache_dir, requester, log_level):
     '''Numismatic Command Line Interface
 
     Examples:
@@ -52,10 +52,10 @@ def numisma(state, collector, cache_dir, requester, log_level):
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
-    from .collectors import CoinCollector
-    state['collector'] = \
-        CoinCollector.factory(collector_name=collector, cache_dir=cache_dir,
-                              requester=requester)
+    from .datafeeds import Datafeed
+    state['datafeed'] = \
+        Datafeed.factory(feed_name=feed, cache_dir=cache_dir,
+                         requester=requester)
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
 
@@ -64,8 +64,8 @@ def numisma(state, collector, cache_dir, requester, log_level):
 @pass_state
 def list_all(state, output):
     "List all available assets"
-    collector = state['collector']
-    assets_list = collector.get_list().keys()
+    datafeed = state['datafeed']
+    assets_list = datafeed.get_list().keys()
     write(assets_list, output, sep=' ')
 
 @numisma.command()
@@ -76,8 +76,8 @@ def list_all(state, output):
 def info(state, assets, output):
     "Info about the requested assets"
     assets = ','.join(assets).split(',')
-    collector = state['collector']
-    all_info = collector.get_list()
+    datafeed = state['datafeed']
+    all_info = datafeed.get_list()
     assets_info = [all_info[a] for a in assets]
     write(assets_info, output)
 
@@ -93,8 +93,8 @@ def prices(state, assets, currencies, output):
     'Latest asset prices'
     assets = ','.join(assets)
     currencies = ','.join(currencies)
-    collector = state['collector']
-    prices = collector.get_prices(coins=assets, currencies=currencies)
+    datafeed = state['datafeed']
+    prices = datafeed.get_prices(coins=assets, currencies=currencies)
     write(prices, output)
 
 
@@ -112,10 +112,10 @@ def history(state, assets, currencies, freq, start_date, end_date, output):
     'Historic asset prices and volumes'
     assets = ','.join(assets).split(',')
     currencies = ','.join(currencies).split(',')
-    collector = state['collector']
+    datafeed = state['datafeed']
     data = []
     for asset, currency in product(assets, currencies):
-        pair_data = collector.get_historical_data(
+        pair_data = datafeed.get_historical_data(
             asset, currency, freq=freq, start_date=start_date, end_date=end_date)
         data.extend(pair_data)
     write(data, output)

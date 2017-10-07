@@ -28,23 +28,19 @@ def date_range(start_date, end_date, delta):
     dates.insert(0, start_date)
     return dates
 
-class CoinCollector:
+class Datafeed:
     "Base class"
 
     @classmethod
-    def factory(cls, collector_name, *args, **kwargs):
-        if not isinstance(collector_name, str):
-            raise TypeError(f'"collector_name" must be a str. '
-                            'Not {type(collector_name)}.')
-        collector_name = collector_name.lower()
-        if collector_name=='cryptocompare':
+    def factory(cls, feed_name, *args, **kwargs):
+        if not isinstance(feed_name, str):
+            raise TypeError(f'"feed_name" must be a str. '
+                            'Not {type(feed_name)}.')
+        feed_name = feed_name.lower()
+        if feed_name=='cryptocompare':
             collector = CryptoCompare(*args, **kwargs)
-        elif collector_name=='bfxdata':
-            collector = BFXData(*args, **kwargs)
-        elif collector_name=='gdax':
-            collector = GDAX(*args, **kwargs)
         else:
-            raise NotImplementedError(f'collector_name: {collector_name}')
+            raise NotImplementedError(f'feed_name: {feed_name}')
         return collector
 
     def __init__(self, requester='base', cache_dir=None):
@@ -72,17 +68,17 @@ class CoinCollector:
         freqmap = dict(d='days', h='hours', m='minutes', s='seconds',
                        ms='milliseconds', us='microseconds')
         freqstr = freqmap[freq]
-        end_date = CoinCollector.to_datetime(end_date)
+        end_date = Datafeed.to_datetime(end_date)
         if isinstance(start_date, int):
             start_date = end_date + timedelta(**{freqstr:start_date})
         else:
-            start_date = CoinCollector.to_datetime(start_date)
+            start_date = Datafeed.to_datetime(start_date)
         interval_time = timedelta(**{freqstr:1})
         intervals = math.ceil((end_date-start_date)/interval_time)
         return start_date, end_date, freqstr, intervals
 
 
-class CryptoCompare(CoinCollector):
+class CryptoCompare(Datafeed):
     '''Low level API for CryptoCompare.com
 
     TODO:
