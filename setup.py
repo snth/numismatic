@@ -3,7 +3,7 @@
 from pathlib import Path
 from setuptools import setup
 
-README = Path('README.md').open('rt').read()
+README = Path('README.rst').open('rt').read()
 REQUIREMENTS = Path('requirements.txt').open('rt').read().strip().split('\n')
 print(REQUIREMENTS)
 VERSION = open(Path('VERSION')).read().strip()
