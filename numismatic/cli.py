@@ -6,10 +6,6 @@ import asyncio
 from streamz import Stream
 import attr
 
-from dashing import HSplit, VSplit, Log, HBrailleChart
-events = Log(title='Events', color=2, border_color=2)
-chart = HBrailleChart(title='Price', color=2, border_color=2)
-ui = VSplit(events, chart)
 
 logger = logging.getLogger(__name__)
 
@@ -208,22 +204,6 @@ def run(state, timeout):
     logger.debug('finishing...')
     loop.run_until_complete(asyncio.sleep(1))
     logger.debug('done')
-        
-
-
-@numisma.command()
-@pass_state
-def dash(state):
-    "Create a dashboard (experimental)"
-    output_stream = state['output_stream']
-    chart_stream = (output_stream
-                    .filter(lambda ev: ev.__class__.__name__=='Trade')
-                    .map(lambda trade: chart.append(10*(trade.price-4300)))
-                    )
-    log_stream = (output_stream
-                  .map(lambda ev: events.append(str(ev)))
-                  .map(lambda x: ui.display())
-                  )
 
 
 def write(data, file, sep='\n'):
