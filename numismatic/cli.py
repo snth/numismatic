@@ -193,7 +193,7 @@ def listen(state, exchange, assets, currencies, channel, api_key_id,
 @coin.command()
 @click.option('--filter', '-f', default='', type=str, multiple=True)
 @click.option('--type', '-t', default=None,
-              type=click.Choice([None, 'Trade', 'Heartbeat']))
+              type=click.Choice(['None', 'Trade', 'Heartbeat']))
 @click.option('--output', '-o', default='-', type=click.File('w'))
 @click.option('--events', 'format', flag_value='events', default=True)
 @click.option('--json', 'format', flag_value='json')
