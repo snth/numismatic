@@ -20,36 +20,42 @@ class LunoExchange:
     exchange = 'Luno'
 
     output_stream = attr.ib()
+    api_key_id = attr.ib()
+    api_key_secret = attr.ib(repr=False)
 
 
     async def listen(self, symbol):
+        symbol = symbol.upper()
         ws = await self._subscribe(symbol)
-        channel_info = await self._subscribe(ws, symbol)
         while True:
             try:
                 packet = await ws.recv()
                 msg = self._handle_packet(packet, symbol)
             except asyncio.CancelledError:
                 ## unsubscribe
-                confirmation = await self._unsubscribe(ws, channel_info)
+                confirmation = await self._unsubscribe(ws, symbol)
 
-    @classmethod
-    async def _subscribe(cls, symbol):
-        wss_url = f'{cls.wss_url}/{symbol}'
+    async def _subscribe(self, symbol):
+        wss_url = f'{self.wss_url}/{symbol}'
         logger.info(f'Connecting to {wss_url} ...')
         ws = await websockets.connect(wss_url)
+        credentials = dict(api_key_id=self.api_key_id,
+                           api_key_secret=self.api_key_secret)
+        await ws.send(json.dumps(credentials))
         packet = await ws.recv()
         initial_order_book = json.loads(packet)
+        # FIXME: Do something with the initial_order_book
         logger.info(initial_order_book)
         return ws
 
     @classmethod
-    async def _unsubscribe(cls, symbol):
+    async def _unsubscribe(cls, ws, symbol):
         return True
 
     def _handle_packet(self, packet, symbol):
         msg = json.loads(packet)
         self.output_stream.emit(msg)
+        # FIXME: handle the packets properly
         return msg
 
 

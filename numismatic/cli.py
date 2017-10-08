@@ -1,4 +1,8 @@
 import logging
+from configparser import ConfigParser
+from appdirs import user_config_dir
+from pathlib import Path
+import os
 import click
 from itertools import chain, product
 from collections import namedtuple
@@ -8,6 +12,14 @@ import attr
 
 
 logger = logging.getLogger(__name__)
+
+
+config = ConfigParser()
+# TODO: better define which files will be supported or use click-config pkg
+for config_file in [Path(user_config_dir()) / 'numismatic.ini',
+                    Path(os.environ['HOME']) / '.coinrc']:
+    if config_file.exists():
+        config.read(config_file)
 
 
 DEFAULT_ASSETS = ['BTC']
@@ -92,6 +104,7 @@ def info(state, assets, output):
 @pass_state
 def prices(state, assets, currencies, output):
     'Latest asset prices'
+    # FIXME: This should also use split here to be consistent
     assets = ','.join(assets)
     currencies = ','.join(currencies)
     datafeed = state['datafeed']
@@ -137,27 +150,42 @@ def tabulate(data):
 
 @coin.command()
 @click.option('--exchange', '-e', default='bitfinex',
-              type=click.Choice(['bitfinex', 'bitstamp', 'gdax', 'gemini',
-                                 'poloniex']))
+              type=click.Choice(['bitfinex', 'luno']))
 @click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--channel', '-C', default='trades', type=click.Choice(['trades', 'ticker']))
+@click.option('--api-key-id', default=None)
+@click.option('--api-key-secret', default=None)
 @pass_state
-def listen(state, exchange, assets, currencies, channel):
+def listen(state, exchange, assets, currencies, channel, api_key_id,
+           api_key_secret):
     'Listen to live events from an exchange'
-    from .exchanges import BitfinexExchange
+    # FIXME: Use a factory function here
+    from .exchanges import BitfinexExchange, LunoExchange
+    assets = ','.join(assets).split(',')
+    currencies = ','.join(currencies).split(',')
+    pairs = list(map(''.join, product(assets, currencies)))
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
     if exchange=='bitfinex':
         exchange = BitfinexExchange(output_stream=output_stream)
-        assets = ','.join(assets).split(',')
-        currencies = ','.join(currencies).split(',')
-        pairs = list(map(''.join, product(assets, currencies)))
         for pair in pairs:
             subscription = exchange.listen(pair, channel)
-            subscriptions[f'{pair}({exchange})'] = subscription
+            subscriptions[f'{pair}-{exchange}'] = subscription
+    elif exchange=='luno':
+        if api_key_id is None:
+            api_key_id = (config['Luno'].get('api_key_id', '') if 'Luno' in
+                          config else '')
+            api_key_secret = (config['Luno'].get('api_key_secret', '') if
+                              'Luno' in config else '')
+        exchange = LunoExchange(output_stream=output_stream,
+                                api_key_id=api_key_id,
+                                api_key_secret=api_key_secret)
+        for pair in pairs:
+            subscription = exchange.listen(pair)
+            subscriptions[f'{pair}-{exchange}'] = subscription
     else:
        raise NotImplementedError()
  
