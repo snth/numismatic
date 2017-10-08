@@ -1,0 +1,39 @@
+{
+  "builders": [
+    {
+      "type": "docker",
+      "image": "alpine",
+      "commit": "true",
+      "changes": [
+        "USER user"
+      ],
+      "run_command": [
+        "--net=host",
+        "-d",
+        "-i",
+        "-t",
+        "{{.Image}}",
+        "/bin/ash"
+      ]
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "script": "{{template_dir}}/provisioners/shell/dependencies.sh"
+    },
+    {
+      "type": "shell",
+      "script": "{{template_dir}}/provisioners/shell/build.sh"
+    }
+  ],
+  "post-processors": [
+    [
+      {
+        "type": "docker-tag",
+        "repository": "numismatic/coin",
+        "tag": "latest"
+      }
+    ]
+  ]
+}

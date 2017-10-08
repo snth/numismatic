@@ -1,0 +1,9 @@
+dcoin() {
+  docker run --net=host -v $PWD:/tmp/working -w=/tmp/working --rm -it numismatic/coin:latest /home/user/numismatic/venv/bin/coin $@
+}
+coinbash() {
+  docker run --net=host -v $PWD:/tmp/working -w=/tmp/working --rm -it numismatic/coin:latest /bin/bash
+}
+coinpy() {
+  docker run --net=host -v $PWD:/tmp/working -w=/tmp/working --rm -it numismatic/coin:latest /home/user/numismatic/venv/bin/python
+}
