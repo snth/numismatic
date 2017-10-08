@@ -6,4 +6,6 @@ dist/
 *.swo
 *.egg-info
 *~
+*.idea/
+venv/
 venv-numismatic/
