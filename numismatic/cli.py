@@ -67,6 +67,7 @@ def coin(state, feed, cache_dir, requester, log_level):
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     from .datafeeds import Datafeed
+    state['cache_dir'] = cache_dir
     state['datafeed'] = \
         Datafeed.factory(feed_name=feed, cache_dir=cache_dir,
                          requester=requester)
@@ -155,12 +156,13 @@ def tabulate(data):
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
+@click.option('--raw-output', '-r', default=None)
 @click.option('--channel', '-C', default='trades', type=click.Choice(['trades', 'ticker']))
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
-def listen(state, exchange, assets, currencies, channel, api_key_id,
-           api_key_secret):
+def listen(state, exchange, assets, currencies, raw_output, channel, 
+           api_key_id, api_key_secret):
     'Listen to live events from an exchange'
     # FIXME: Use a factory function here
     from .exchanges import BitfinexExchange, LunoExchange
@@ -170,7 +172,8 @@ def listen(state, exchange, assets, currencies, channel, api_key_id,
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
     if exchange=='bitfinex':
-        exchange = BitfinexExchange(output_stream=output_stream)
+        exchange = BitfinexExchange(output_stream=output_stream,
+                                    raw_stream=raw_output)
         for pair in pairs:
             subscription = exchange.listen(pair, channel)
             subscriptions[f'{pair}-{exchange}'] = subscription
@@ -181,6 +184,7 @@ def listen(state, exchange, assets, currencies, channel, api_key_id,
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
         exchange = LunoExchange(output_stream=output_stream,
+                                raw_stream=raw_output,
                                 api_key_id=api_key_id,
                                 api_key_secret=api_key_secret)
         for pair in pairs:

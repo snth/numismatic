@@ -1,31 +1,72 @@
 import logging
-import websockets
 import asyncio
 import json
 import time
+import abc
+from pathlib import Path
+from streamz import Stream
+
 import attr
+import websockets
 
 from .events import Heartbeat, Trade
 
 
 logger = logging.getLogger(__name__)
 
+LIBRARY_NAME = 'numismatic'
+
 
 @attr.s
-class LunoExchange:
+class Exchange(abc.ABC):
+    '''Base class for Exchanges'''
+    output_stream = attr.ib()
+    raw_stream = attr.ib(default=None)
+
+    @abc.abstractmethod
+    async def listen(self, symbol):
+        print(self.raw_stream)
+        if self.raw_stream is not None:
+            if self.raw_stream is True:
+                from appdirs import user_cache_dir
+                self.raw_stream = user_cache_dir(LIBRARY_NAME)
+            filename = f'{self.exchange}_{symbol}_{{date}}.json'
+            raw_stream_path = str(Path(self.raw_stream) / filename)
+            print(raw_stream_path)
+
+            def write_to_file(packet):
+                date = time.strftime('%Y%m%d')
+                path = raw_stream_path.format(date=date)
+                print(f'Writing to {path} ...')
+                with open(path, 'at') as f:
+                    f.write(packet)
+
+            self.raw_stream = Stream()
+            self.raw_stream.map(write_to_file)
+             
+
+    @abc.abstractmethod
+    def _handle_packet(self, packet, symbol):
+        # record the raw packets on the raw_stream
+        if self.raw_stream is not None:
+            self.raw_stream.emit(packet)
+
+
+@attr.s
+class LunoExchange(Exchange):
     '''Websocket client for the Luno Exchange
 
     '''
     wss_url = 'wss://ws.luno.com/api/1/stream'
     exchange = 'Luno'
 
-    output_stream = attr.ib()
-    api_key_id = attr.ib()
-    api_key_secret = attr.ib(repr=False)
+    api_key_id = attr.ib(default=None)
+    api_key_secret = attr.ib(default=None, repr=False)
 
 
     async def listen(self, symbol):
         symbol = symbol.upper()
+        await super().listen(symbol)
         ws = await self._subscribe(symbol)
         while True:
             try:
@@ -45,7 +86,8 @@ class LunoExchange:
         packet = await ws.recv()
         initial_order_book = json.loads(packet)
         # FIXME: Do something with the initial_order_book
-        logger.info(initial_order_book)
+        logger.debug(initial_order_book)
+        super()._handle_packet(packet, symbol)
         return ws
 
     @classmethod
@@ -53,6 +95,7 @@ class LunoExchange:
         return True
 
     def _handle_packet(self, packet, symbol):
+        super()._handle_packet(packet, symbol)
         msg = json.loads(packet)
         self.output_stream.emit(msg)
         # FIXME: handle the packets properly
@@ -61,7 +104,7 @@ class LunoExchange:
 
 
 @attr.s
-class BitfinexExchange:
+class BitfinexExchange(Exchange):
     '''Websocket client for the Bitfinex Exchange
 
     This currently opens a separate socket for every symbol that we listen to.
@@ -70,8 +113,6 @@ class BitfinexExchange:
 
     wss_url = 'wss://api.bitfinex.com/ws/2'
     exchange = 'Bitfinex'
-
-    output_stream = attr.ib()
 
 
     @classmethod
