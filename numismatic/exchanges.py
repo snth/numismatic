@@ -4,8 +4,9 @@ import json
 import time
 import abc
 from pathlib import Path
-from streamz import Stream
+import gzip
 
+from streamz import Stream
 import attr
 import websockets
 
@@ -25,24 +26,24 @@ class Exchange(abc.ABC):
 
     @abc.abstractmethod
     async def listen(self, symbol):
-        print(self.raw_stream)
         if self.raw_stream is not None:
             if self.raw_stream is True:
                 from appdirs import user_cache_dir
                 self.raw_stream = user_cache_dir(LIBRARY_NAME)
-            filename = f'{self.exchange}_{symbol}_{{date}}.json'
+            date = time.strftime('%Y%m%dT%H%M%S')
+            filename = f'{self.exchange}_{symbol}_{date}.json.gzip'
             raw_stream_path = str(Path(self.raw_stream) / filename)
-            print(raw_stream_path)
+            logger.info(f'Writing raw stream to {raw_stream_path} ...')
 
             def write_to_file(packet):
-                date = time.strftime('%Y%m%d')
-                path = raw_stream_path.format(date=date)
-                print(f'Writing to {path} ...')
-                with open(path, 'at') as f:
-                    f.write(packet)
+                logger.info('Writing packet ...')
+                with gzip.open(raw_stream_path, 'at') as f:
+                    f.write(packet+'\n')
 
             self.raw_stream = Stream()
-            self.raw_stream.map(write_to_file)
+            (self.raw_stream
+             .map(write_to_file)
+             )
              
 
     @abc.abstractmethod
