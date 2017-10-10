@@ -32,7 +32,7 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
 @click.option('--feed', '-f', default='cryptocompare',
               type=click.Choice(['cryptocompare', 'luno']))
 @click.option('--cache-dir', '-d', default=None)
-@click.option('--requester', '-r', default='caching',
+@click.option('--requester', '-r', default='base',
               type=click.Choice(['base', 'caching']))
 @click.option('--log-level', '-l', default='info', 
               type=click.Choice(['debug', 'info', 'warning', 'error',
