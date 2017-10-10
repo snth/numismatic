@@ -173,10 +173,10 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
     if exchange=='bitfinex':
-        exchange = BitfinexExchange(output_stream=output_stream,
-                                    raw_stream=raw_output,
-                                    batch_size=batch_size)
         for pair in pairs:
+            exchange = BitfinexExchange(output_stream=output_stream,
+                                        raw_stream=raw_output,
+                                        batch_size=batch_size)
             subscription = exchange.listen(pair, channel)
             subscriptions[f'{pair}-{exchange}'] = subscription
     elif exchange=='luno':

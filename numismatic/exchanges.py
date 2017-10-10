@@ -37,7 +37,7 @@ class Exchange(abc.ABC):
             logger.info(f'Writing raw stream to {raw_stream_path} ...')
 
             def write_to_file(batch):
-                logger.info(f'Writing batch {len(batch)} for {symbol} ...')
+                logger.info(f'Writing batch of {len(batch)} for {symbol} ...')
                 with gzip.open(raw_stream_path, 'at') as f:
                     for packet in batch:
                         f.write(packet+'\n')
