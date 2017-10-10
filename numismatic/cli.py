@@ -157,12 +157,13 @@ def tabulate(data):
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--raw-output', '-r', default=None)
+@click.option('--batch-size', '-b', default=1, type=int)
 @click.option('--channel', '-C', default='trades', type=click.Choice(['trades', 'ticker']))
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
-def listen(state, exchange, assets, currencies, raw_output, channel, 
-           api_key_id, api_key_secret):
+def listen(state, exchange, assets, currencies, raw_output, batch_size, 
+           channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
     # FIXME: Use a factory function here
     from .exchanges import BitfinexExchange, LunoExchange
@@ -173,7 +174,8 @@ def listen(state, exchange, assets, currencies, raw_output, channel,
     subscriptions = state['subscriptions']
     if exchange=='bitfinex':
         exchange = BitfinexExchange(output_stream=output_stream,
-                                    raw_stream=raw_output)
+                                    raw_stream=raw_output,
+                                    batch_size=batch_size)
         for pair in pairs:
             subscription = exchange.listen(pair, channel)
             subscriptions[f'{pair}-{exchange}'] = subscription
@@ -185,6 +187,7 @@ def listen(state, exchange, assets, currencies, raw_output, channel,
                               'Luno' in config else '')
         exchange = LunoExchange(output_stream=output_stream,
                                 raw_stream=raw_output,
+                                batch_size=batch_size,
                                 api_key_id=api_key_id,
                                 api_key_secret=api_key_secret)
         for pair in pairs:

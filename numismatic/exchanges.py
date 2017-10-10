@@ -23,6 +23,7 @@ class Exchange(abc.ABC):
     '''Base class for Exchanges'''
     output_stream = attr.ib()
     raw_stream = attr.ib(default=None)
+    batch_size = attr.ib(default=1)
 
     @abc.abstractmethod
     async def listen(self, symbol):
@@ -35,14 +36,16 @@ class Exchange(abc.ABC):
             raw_stream_path = str(Path(self.raw_stream) / filename)
             logger.info(f'Writing raw stream to {raw_stream_path} ...')
 
-            def write_to_file(packet):
-                logger.info('Writing packet ...')
+            def write_to_file(batch):
+                logger.info(f'Writing batch {len(batch)} for {symbol} ...')
                 with gzip.open(raw_stream_path, 'at') as f:
-                    f.write(packet+'\n')
+                    for packet in batch:
+                        f.write(packet+'\n')
 
             self.raw_stream = Stream()
             (self.raw_stream
-             .map(write_to_file)
+             .partition(self.batch_size)
+             .sink(write_to_file)
              )
              
 
