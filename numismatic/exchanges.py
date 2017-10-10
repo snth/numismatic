@@ -31,7 +31,7 @@ class Exchange(abc.ABC):
                 from appdirs import user_cache_dir
                 self.raw_stream = user_cache_dir(LIBRARY_NAME)
             date = time.strftime('%Y%m%dT%H%M%S')
-            filename = f'{self.exchange}_{symbol}_{date}.json.gzip'
+            filename = f'{self.exchange}_{symbol}_{date}.json.gz'
             raw_stream_path = str(Path(self.raw_stream) / filename)
             logger.info(f'Writing raw stream to {raw_stream_path} ...')
 
@@ -136,6 +136,7 @@ class BitfinexExchange(Exchange):
 
     async def listen(self, symbol, channel='trades'):
         ws = await self._connect()
+        await super().listen(symbol)
         channel_info = await self._subscribe(ws, symbol,  channel)
         while True:
             try:
@@ -175,6 +176,7 @@ class BitfinexExchange(Exchange):
         return confirmation
 
     def _handle_packet(self, packet, symbol):
+        super()._handle_packet(packet, symbol)
         msg = json.loads(packet)
         if isinstance(msg, dict) and 'event' in msg:
             pass
