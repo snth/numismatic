@@ -221,7 +221,10 @@ def collect(state, filter, type, output, format):
 @click.option('--timeout', '-t', default=15)
 @pass_state
 def run(state, timeout):
-    'Run the asyncio event loop for a set amount of time'
+    """
+    Run the asyncio event loop for a set amount of time. Defaults to
+    15 seconds. Set to 0 to run indefinitely.
+    """
     if not timeout:
         # Allow to run indefinitely if timeout==0
         timeout = None
