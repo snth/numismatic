@@ -89,7 +89,7 @@ def list_all(state, output):
 @pass_state
 def info(state, assets, output):
     "Info about the requested assets"
-    assets = ','.join(assets).split(',')
+    assets = ','.join(assets)
     datafeed = state['datafeed']
     assets_info = datafeed.get_info(assets)
     write(assets_info, output)
