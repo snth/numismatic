@@ -1,31 +1,76 @@
 import logging
-import websockets
 import asyncio
 import json
 import time
+import abc
+from pathlib import Path
+import gzip
+
+from streamz import Stream
 import attr
+import websockets
 
 from .events import Heartbeat, Trade
 
 
 logger = logging.getLogger(__name__)
 
+LIBRARY_NAME = 'numismatic'
+
 
 @attr.s
-class LunoExchange:
+class Exchange(abc.ABC):
+    '''Base class for Exchanges'''
+    output_stream = attr.ib()
+    raw_stream = attr.ib(default=None)
+    batch_size = attr.ib(default=1)
+
+    @abc.abstractmethod
+    async def listen(self, symbol):
+        if self.raw_stream is not None:
+            if self.raw_stream=='':
+                from appdirs import user_cache_dir
+                self.raw_stream = user_cache_dir(LIBRARY_NAME)
+            date = time.strftime('%Y%m%dT%H%M%S')
+            filename = f'{self.exchange}_{symbol}_{date}.json.gz'
+            raw_stream_path = str(Path(self.raw_stream) / filename)
+            logger.info(f'Writing raw stream to {raw_stream_path} ...')
+
+            def write_to_file(batch):
+                logger.info(f'Writing batch of {len(batch)} for {symbol} ...')
+                with gzip.open(raw_stream_path, 'at') as f:
+                    for packet in batch:
+                        f.write(packet+'\n')
+
+            self.raw_stream = Stream()
+            (self.raw_stream
+             .partition(self.batch_size)
+             .sink(write_to_file)
+             )
+             
+
+    @abc.abstractmethod
+    def _handle_packet(self, packet, symbol):
+        # record the raw packets on the raw_stream
+        if self.raw_stream is not None:
+            self.raw_stream.emit(packet)
+
+
+@attr.s
+class LunoExchange(Exchange):
     '''Websocket client for the Luno Exchange
 
     '''
     wss_url = 'wss://ws.luno.com/api/1/stream'
     exchange = 'Luno'
 
-    output_stream = attr.ib()
-    api_key_id = attr.ib()
-    api_key_secret = attr.ib(repr=False)
+    api_key_id = attr.ib(default=None)
+    api_key_secret = attr.ib(default=None, repr=False)
 
 
     async def listen(self, symbol):
         symbol = symbol.upper()
+        await super().listen(symbol)
         ws = await self._subscribe(symbol)
         while True:
             try:
@@ -45,7 +90,8 @@ class LunoExchange:
         packet = await ws.recv()
         initial_order_book = json.loads(packet)
         # FIXME: Do something with the initial_order_book
-        logger.info(initial_order_book)
+        logger.debug(initial_order_book)
+        super()._handle_packet(packet, symbol)
         return ws
 
     @classmethod
@@ -53,6 +99,7 @@ class LunoExchange:
         return True
 
     def _handle_packet(self, packet, symbol):
+        super()._handle_packet(packet, symbol)
         msg = json.loads(packet)
         self.output_stream.emit(msg)
         # FIXME: handle the packets properly
@@ -61,7 +108,7 @@ class LunoExchange:
 
 
 @attr.s
-class BitfinexExchange:
+class BitfinexExchange(Exchange):
     '''Websocket client for the Bitfinex Exchange
 
     This currently opens a separate socket for every symbol that we listen to.
@@ -70,8 +117,6 @@ class BitfinexExchange:
 
     wss_url = 'wss://api.bitfinex.com/ws/2'
     exchange = 'Bitfinex'
-
-    output_stream = attr.ib()
 
 
     @classmethod
@@ -94,6 +139,7 @@ class BitfinexExchange:
 
     async def listen(self, symbol, channel='trades'):
         ws = await self._connect()
+        await super().listen(symbol)
         channel_info = await self._subscribe(ws, symbol,  channel)
         while True:
             try:
@@ -133,6 +179,7 @@ class BitfinexExchange:
         return confirmation
 
     def _handle_packet(self, packet, symbol):
+        super()._handle_packet(packet, symbol)
         msg = json.loads(packet)
         if isinstance(msg, dict) and 'event' in msg:
             pass
