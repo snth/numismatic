@@ -28,7 +28,7 @@ class Exchange(abc.ABC):
     @abc.abstractmethod
     async def listen(self, symbol):
         if self.raw_stream is not None:
-            if self.raw_stream is True:
+            if self.raw_stream=='':
                 from appdirs import user_cache_dir
                 self.raw_stream = user_cache_dir(LIBRARY_NAME)
             date = time.strftime('%Y%m%dT%H%M%S')
