@@ -4,6 +4,7 @@ import math
 import time
 from datetime import datetime, timedelta
 from dateutil.parser import parse
+from .utils import date_range, make_list_str, to_datetime
 import abc
 
 from pathlib import Path
@@ -12,33 +13,6 @@ import asyncio
 from .requesters import Requester
 
 logger = logging.getLogger(__name__)
-
-
-# TODO: move the utility functions to lib module
-def make_list_str(items):
-    if isinstance(items, str):
-        items = items.split(',')
-    return ','.join(items)
-
-def date_range(start_date, end_date, delta):
-    dates = []
-
-    while end_date > start_date:
-        dates.insert(0, end_date)
-        end_date -= delta
-    
-    dates.insert(0, start_date)
-    return dates
-
-
-def to_datetime(datelike, origin=None):
-    if datelike is None:
-        return datetime.now()
-    elif isinstance(datelike, str):
-        return parse(datelike)
-    else:
-        raise TypeError(f'{datelike}')
-
 
 def _validate_dates(start_date, end_date, freq):
     freqmap = dict(d='days', h='hours', m='minutes', s='seconds',
@@ -52,7 +26,6 @@ def _validate_dates(start_date, end_date, freq):
     interval_time = timedelta(**{freqstr:1})
     intervals = math.ceil((end_date-start_date)/interval_time)
     return start_date, end_date, freqstr, intervals
-
 
 class Datafeed(abc.ABC):
     "Base class"
