@@ -217,7 +217,7 @@ def collect(state, filter, type, output, format):
         output_stream = output_stream.filter(
             lambda x: eval(filter, attr.asdict(x)))
     if format=='json':
-        output_stream = output_stream.map(attr.asdict)
+        output_stream = output_stream.map(lambda ev: ev.json())
     sink = (output_stream
             .map(lambda ev: output.write(str(ev)+'\n'))
             .map(lambda ev: output.flush())
