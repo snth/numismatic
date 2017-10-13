@@ -101,8 +101,18 @@ class LunoExchange(Exchange):
     def _handle_packet(self, packet, symbol):
         super()._handle_packet(packet, symbol)
         msg = json.loads(packet)
-        self.output_stream.emit(msg)
-        # FIXME: handle the packets properly
+        timestamp = float(msg['timestamp'])/1000
+        if 'trade_updates' in msg and msg['trade_updates']:
+            for trade in msg['trade_updates']:
+                volume = float(trade['base'])
+                value = float(trade['counter'])
+                price = value/volume
+                id = trade['order_id']
+                trade_ev = Trade('Luno', symbol, timestamp, price, volume, id)
+                self.output_stream.emit(trade_ev)
+        else:
+            # FIXME: handle the order book events
+            pass 
         return msg
 
 
