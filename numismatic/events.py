@@ -1,16 +1,25 @@
 import time
+import json     # TOOD: use a faster json library if necessary
+
 import attr
 
 
+@attr.s
+class Event:
+
+    def json(self):
+        return json.dumps(attr.asdict(self))
+
+
 @attr.s(slots=True)
-class Heartbeat:
+class Heartbeat(Event):
     exchange = attr.ib()
     symbol = attr.ib()
     timestamp = attr.ib(default=attr.Factory(time.time))
 
 
 @attr.s(slots=True)
-class Trade:
+class Trade(Event):
     exchange = attr.ib()
     symbol = attr.ib()
     timestamp = attr.ib()
