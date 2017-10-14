@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 README = Path('README.rst').open('rt').read()
 REQUIREMENTS = Path('requirements.txt').open('rt').read().strip().split('\n')
-VERSION = open(Path('VERSION')).read().strip()
+VERSION = open(Path('VERSION.txt')).read().strip()
 
 setup(name='numismatic',
       version=VERSION,
@@ -17,7 +17,7 @@ setup(name='numismatic',
       keywords='bitcoin,ethereum,cryptocurrencies',
       packages=find_packages(),
       package_data={
-          '': ['*.txt', '*.md', '*.rst', 'VERSION'],
+          '': ['*.txt', '*.md', '*.rst'],
           },
       long_description=README,
       install_requires=REQUIREMENTS,
