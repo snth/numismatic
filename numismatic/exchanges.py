@@ -10,7 +10,7 @@ from streamz import Stream
 import attr
 import websockets
 
-from .events import Heartbeat, Trade
+from .events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 
 logger = logging.getLogger(__name__)
@@ -88,19 +88,44 @@ class LunoExchange(Exchange):
                            api_key_secret=self.api_key_secret)
         await ws.send(json.dumps(credentials))
         packet = await ws.recv()
-        initial_order_book = json.loads(packet)
-        # FIXME: Do something with the initial_order_book
-        logger.debug(initial_order_book)
-        super()._handle_packet(packet, symbol)
+        self._handle_order_book(packet, symbol)
         return ws
 
     @classmethod
     async def _unsubscribe(cls, ws, symbol):
         return True
 
+    def _handle_order_book(self, packet, symbol):
+        timestamp = time.time()
+        super()._handle_packet(packet, symbol)
+        order_book = json.loads(packet)
+        if 'asks' in order_book:
+            sign = -1
+            for order in order_book['asks']:
+                id = order['id']
+                volume = float(order['volume'])
+                price = sign * float(order['price'])
+                order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
+                                    timestamp=timestamp, price=price,
+                                    volume=volume, id=id)
+                self.output_stream.emit(order_ev)
+        if 'bids' in order_book:
+            sign = 1
+            for order in order_book['bids']:
+                id = order['id']
+                volume = float(order['volume'])
+                price = sign * float(order['price'])
+                order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
+                                    timestamp=timestamp, price=price,
+                                    volume=volume, id=id)
+                self.output_stream.emit(order_ev)
+        return order_book
+
     def _handle_packet(self, packet, symbol):
         super()._handle_packet(packet, symbol)
         msg = json.loads(packet)
+        # TODO: Implement handling of sequence numbers for detecting missing
+        #       events
         timestamp = float(msg['timestamp'])/1000
         if 'trade_updates' in msg and msg['trade_updates']:
             for trade in msg['trade_updates']:
@@ -108,11 +133,26 @@ class LunoExchange(Exchange):
                 value = float(trade['counter'])
                 price = value/volume
                 id = trade['order_id']
-                trade_ev = Trade('Luno', symbol, timestamp, price, volume, id)
+                trade_ev = Trade(exchange=self.exchange, symbol=symbol,
+                                 timestamp=timestamp, price=price,
+                                 volume=volume, id=id)
                 self.output_stream.emit(trade_ev)
-        else:
-            # FIXME: handle the order book events
-            pass 
+        if 'create_update' in msg and msg['create_update']:
+            order = msg['create_update']
+            sign = 1 if order['type']=='BID' else -1
+            id = order['order_id']
+            volume = float(order['volume'])
+            price = sign * float(order['price'])
+            order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
+                                  timestamp=timestamp, price=price,
+                                  volume=volume, id=id)
+            self.output_stream.emit(order_ev)
+        if 'delete_update' in msg and msg['delete_update']:
+            delete_update = msg['delete_update']
+            id = delete_update['order_id']
+            cancel_ev = CancelOrder(exchange=self.exchange, symbol=symbol,
+                                    timestamp=timestamp, id=id)
+            self.output_stream.emit(cancel_ev)
         return msg
 
 
