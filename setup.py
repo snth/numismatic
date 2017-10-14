@@ -21,10 +21,17 @@ setup(name='numismatic',
           },
       long_description=README,
       install_requires=REQUIREMENTS,
-      python_requires='>=3.6',
+      python_requires='~=3.6',
       zip_safe=False,
       entry_points='''
           [console_scripts]
           coin=numismatic.cli:coin
-          '''
+          ''',
+      classifiers=(
+          'Development Status :: 3 - Alpha',
+          'License :: OSI Approved :: MIT License',
+          'Programming Language :: Python',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: Implementation :: CPython',
+      ),
       )
