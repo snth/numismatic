@@ -158,7 +158,8 @@ def tabulate(data):
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--raw-output', '-r', default=None)
 @click.option('--batch-size', '-b', default=1, type=int)
-@click.option('--channel', '-C', default='trades', type=click.Choice(['trades', 'ticker']))
+@click.option('--channel', '-C', default='trades',
+              type=click.Choice(['trades', 'ticker']))
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
@@ -194,8 +195,8 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
             subscription = exchange.listen(pair)
             subscriptions[f'{pair}-{exchange}'] = subscription
     else:
-       raise NotImplementedError()
- 
+        raise NotImplementedError()
+
 
 @coin.command()
 @click.option('--filter', '-f', default='', type=str, multiple=True)
@@ -255,6 +256,4 @@ def write(data, file, sep='\n'):
 
 
 if __name__ == '__main__':
-    # TODO: Check the click docs if the auto_envvars_prefix can be set
-    #       elsewhere.
-    coin(auto_envvars_prefix=f'{ENVVAR_PREFIX}')
+    coin()
