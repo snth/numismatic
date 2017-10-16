@@ -53,6 +53,7 @@ class Exchange(abc.ABC):
             self.raw_stream = Stream()
             (self.raw_stream
              .timed_window(self.batch_size)
+             .filter(len)
              .sink(write_to_file)
              )
              
