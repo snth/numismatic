@@ -122,6 +122,7 @@ class BitfinexExchange(Exchange):
 
 if __name__=='__main__':
     # Simple example of how these should be used
+    # Test with: python -m numismatic.exchanges.bitfinex
     logging.basicConfig(level=logging.INFO)
     from streamz import Stream
     output_stream = Stream()
@@ -129,11 +130,9 @@ if __name__=='__main__':
 
     bfx = BitfinexExchange(output_stream=output_stream)
     bfx_btc = bfx.listen('BTCUSD', 'trades')
-    luno = LunoExchange(output_stream=output_stream)
-    luno_btc = luno.listen('XBTZAR')
 
     loop = asyncio.get_event_loop()
-    future = asyncio.wait([luno_btc], timeout=15)
+    future = asyncio.wait([bfx_btc], timeout=15)
     completed, pending = loop.run_until_complete(future)
     for task in pending:
         task.cancel()

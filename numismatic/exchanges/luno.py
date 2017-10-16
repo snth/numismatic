@@ -111,3 +111,31 @@ class LunoExchange(Exchange):
                                     timestamp=timestamp, id=id)
             self.output_stream.emit(cancel_ev)
         return msg
+
+
+if __name__=='__main__':
+    # Simple example of how these should be used
+    # Test with: python -m numismatic.exchanges.luno
+    from configparser import ConfigParser
+    from pathlib import Path
+    from streamz import Stream
+    logging.basicConfig(level=logging.INFO)
+    config = ConfigParser()
+    config.read(Path.home() / '.coinrc')
+    print(list(config.keys()))
+    api_key_id = config['Luno'].get('api_key_id', '')
+    api_key_secret = config['Luno'].get('api_key_secret', '') 
+
+    output_stream = Stream()
+    printer = output_stream.map(print)
+
+    luno = LunoExchange(output_stream=output_stream, api_key_id=api_key_id,
+                        api_key_secret=api_key_secret)
+    luno_btc = luno.listen('XBTZAR')
+
+    loop = asyncio.get_event_loop()
+    future = asyncio.wait([luno_btc], timeout=15)
+    completed, pending = loop.run_until_complete(future)
+    for task in pending:
+        task.cancel()
+
