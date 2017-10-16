@@ -18,7 +18,7 @@ class Exchange(abc.ABC):
     '''Base class for Exchanges'''
     output_stream = attr.ib()
     raw_stream = attr.ib(default=None)
-    batch_size = attr.ib(default=1)
+    raw_interval = attr.ib(default=1)
 
     @classmethod
     def factory(cls, exchange_name, *args, **kwargs):
@@ -45,14 +45,14 @@ class Exchange(abc.ABC):
             logger.info(f'Writing raw stream to {raw_stream_path} ...')
 
             def write_to_file(batch):
-                logger.info(f'Writing batch of {len(batch)} for {symbol} ...')
+                logger.debug(f'Writing batch of {len(batch)} for {symbol} ...')
                 with gzip.open(raw_stream_path, 'at') as f:
                     for packet in batch:
                         f.write(packet+'\n')
 
             self.raw_stream = Stream()
             (self.raw_stream
-             .timed_window(self.batch_size)
+             .timed_window(self.raw_interval)
              .filter(len)
              .sink(write_to_file)
              )

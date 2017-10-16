@@ -163,14 +163,19 @@ def tabulate(data):
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
-@click.option('--raw-output', '-r', default=None)
-@click.option('--batch-size', '-b', default=1, type=int)    # FIXME: rename to batch-interval
+@click.option('--raw-output', '-r', default=None, help="Path to write raw "
+              "stream to")
+@click.option('--raw-interval', '-i', default=1, 
+              type=float, help="The interval between writing the raw stream "
+              "to disk")
+# FIXME: The --channel and --api-key-* options are exchange specific and 
+#        should probably be handled differently.
 @click.option('--channel', '-C', default='trades',
               type=click.Choice(['trades', 'ticker']))
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
-def listen(state, exchange, assets, currencies, raw_output, batch_size, 
+def listen(state, exchange, assets, currencies, raw_output, raw_interval, 
            channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
     # FIXME: Use a factory function here
@@ -184,7 +189,7 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
             exchange = Exchange.factory(exchange_name='bitfinex',
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
-                                        batch_size=batch_size)
+                                        raw_interval=raw_interval)
             subscription = exchange.listen(pair, channel)
             subscriptions[f'{pair}-{exchange}'] = subscription
     elif exchange=='luno':
@@ -196,7 +201,7 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
         exchange = Exchange.factory(exchange_name='luno',
                                     output_stream=output_stream,
                                     raw_stream=raw_output,
-                                    batch_size=batch_size,
+                                    raw_interval=raw_interval,
                                     api_key_id=api_key_id,
                                     api_key_secret=api_key_secret)
         for pair in pairs:
