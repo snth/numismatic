@@ -52,7 +52,7 @@ class Exchange(abc.ABC):
 
             self.raw_stream = Stream()
             (self.raw_stream
-             .partition(self.batch_size)
+             .timed_window(self.batch_size)
              .sink(write_to_file)
              )
              

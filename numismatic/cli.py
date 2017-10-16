@@ -1,6 +1,5 @@
 import logging
 from configparser import ConfigParser
-from appdirs import user_config_dir
 from pathlib import Path
 import os
 import click
@@ -8,6 +7,8 @@ from itertools import chain, product
 from collections import namedtuple
 import asyncio
 
+from appdirs import user_config_dir
+from tornado.platform.asyncio import AsyncIOMainLoop
 from streamz import Stream
 import attr
 
@@ -17,6 +18,8 @@ from numismatic.feeds import *
 from numismatic.exchanges import *
 
 logger = logging.getLogger(__name__)
+
+AsyncIOMainLoop().install()
 
 
 config = ConfigParser()
@@ -161,7 +164,7 @@ def tabulate(data):
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--raw-output', '-r', default=None)
-@click.option('--batch-size', '-b', default=1, type=int)
+@click.option('--batch-size', '-b', default=1, type=int)    # FIXME: rename to batch-interval
 @click.option('--channel', '-C', default='trades',
               type=click.Choice(['trades', 'ticker']))
 @click.option('--api-key-id', default=None)
