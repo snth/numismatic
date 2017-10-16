@@ -22,7 +22,6 @@ class Exchange(abc.ABC):
 
     @classmethod
     def factory(cls, exchange_name, *args, **kwargs):
-        from . import *
         if not isinstance(exchange_name, str):
             raise TypeError(f'"exchange_name" must be a str. '
                             'Not {type(exchange_name)}.')
