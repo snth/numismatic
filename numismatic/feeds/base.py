@@ -1,6 +1,7 @@
 import logging
 import abc
-from numismatic.libs.requesters import Requester
+
+from ..libs.requesters import Requester
 
 logger = logging.getLogger(__name__)
 

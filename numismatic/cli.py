@@ -7,6 +7,7 @@ import click
 from itertools import chain, product
 from collections import namedtuple
 import asyncio
+
 from streamz import Stream
 import attr
 
@@ -191,10 +192,11 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
         exchange = Exchange.factory(exchange_name='luno',
-                            raw_stream=raw_output,
-                                batch_size=batch_size,
-                                api_key_id=api_key_id,
-                                api_key_secret=api_key_secret)
+                                    output_stream=output_stream,
+                                    raw_stream=raw_output,
+                                    batch_size=batch_size,
+                                    api_key_id=api_key_id,
+                                    api_key_secret=api_key_secret)
         for pair in pairs:
             subscription = exchange.listen(pair)
             subscriptions[f'{pair}-{exchange}'] = subscription

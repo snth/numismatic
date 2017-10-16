@@ -1,4 +1,7 @@
-from numismatic.feeds import Feed
+from itertools import product
+
+from .base import Feed
+
 
 class Luno(Feed):
 
