@@ -20,9 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 config = ConfigParser()
-# TODO: better define which files will be supported or use click-config pkg
-for config_file in [Path(user_config_dir()) / 'numismatic.ini',
-                    Path(os.environ['HOME']) / '.coinrc']:
+for config_file in [Path(os.environ['HOME']) / '.coinrc']:
+    # Could add other paths like: Path(user_config_dir()) / 'numismatic.ini'
     if config_file.exists():
         config.read(config_file)
 
