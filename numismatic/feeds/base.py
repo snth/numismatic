@@ -4,6 +4,7 @@ from numismatic.libs.requesters import Requester
 
 logger = logging.getLogger(__name__)
 
+
 class Feed(abc.ABC):
     "Feed Base class"
 

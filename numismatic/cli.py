@@ -10,6 +10,8 @@ import asyncio
 from streamz import Stream
 import attr
 
+# I don't like these * imports but they're required for the factory() methods
+# to work.
 from numismatic.feeds import *
 from numismatic.exchanges import *
 
@@ -176,7 +178,8 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
     subscriptions = state['subscriptions']
     if exchange=='bitfinex':
         for pair in pairs:
-            exchange = BitfinexExchange(output_stream=output_stream,
+            exchange = Exchange.factory(exchange_name='bitfinex',
+                                        output_stream=output_stream,
                                         raw_stream=raw_output,
                                         batch_size=batch_size)
             subscription = exchange.listen(pair, channel)
@@ -187,8 +190,8 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
                           config else '')
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
-        exchange = LunoExchange(output_stream=output_stream,
-                                raw_stream=raw_output,
+        exchange = Exchange.factory(exchange_name='luno',
+                            raw_stream=raw_output,
                                 batch_size=batch_size,
                                 api_key_id=api_key_id,
                                 api_key_secret=api_key_secret)
