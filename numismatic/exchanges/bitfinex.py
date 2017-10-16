@@ -8,10 +8,11 @@ from streamz import Stream
 import attr
 import websockets
 
-from numismatic.exchanges import Exchange
-from numismatic.libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
+from .base import Exchange
+from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
+
 
 @attr.s
 class BitfinexExchange(Exchange):
