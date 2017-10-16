@@ -1,97 +1,18 @@
-import logging
-from itertools import product, chain
 import math
-import time
-from datetime import datetime, timedelta
-from dateutil.parser import parse
-from .utils import date_range, make_list_str, to_datetime
+import logging
 import abc
+import time
+from datetime import timedelta
+from dateutil.parser import parse
 
-from pathlib import Path
-import asyncio
+from .base import Feed
+from ..libs.utils import date_range, make_list_str, to_datetime, \
+    dates_and_frequencies
 
-from .requesters import Requester
 
 logger = logging.getLogger(__name__)
 
-def _validate_dates(start_date, end_date, freq):
-    freqmap = dict(d='days', h='hours', m='minutes', s='seconds',
-                    ms='milliseconds', us='microseconds')
-    freqstr = freqmap[freq]
-    end_date = to_datetime(end_date)
-    if isinstance(start_date, int):
-        start_date = end_date + timedelta(**{freqstr:start_date})
-    else:
-        start_date = to_datetime(start_date)
-    interval_time = timedelta(**{freqstr:1})
-    intervals = math.ceil((end_date-start_date)/interval_time)
-    return start_date, end_date, freqstr, intervals
-
-class Datafeed(abc.ABC):
-    "Base class"
-
-    @classmethod
-    def factory(cls, feed_name, *args, **kwargs):
-        if not isinstance(feed_name, str):
-            raise TypeError(f'"feed_name" must be a str. '
-                            'Not {type(feed_name)}.')
-        feed_name = feed_name.lower()
-        subclasses = {subcls.__name__.lower():subcls for subcls in 
-                      cls.__subclasses__()}
-        subclass = subclasses[feed_name]
-        feed = subclass(*args, **kwargs)
-        return feed
-
-    def __init__(self, requester='base', cache_dir=None):
-        # TODO: Use attrs here
-        if not isinstance(requester, Requester):
-            requester = Requester.factory(requester, cache_dir=cache_dir)
-        self.requester = requester
-        self.cache_dir = cache_dir
-
-    def _make_request(self, api_url, params=None):
-        response = self.requester.get(api_url, params=params)
-        data = response.json()
-        return data
-
-    @abc.abstractmethod
-    def get_list(self):
-        return
-
-    @abc.abstractmethod
-    def get_info(self, assets):
-        return
-
-    @abc.abstractmethod
-    def get_prices(self, assets, currencies):
-        return
-
-
-class Luno(Datafeed):
-
-    api_url = 'https://api.mybitx.com/api/1/'
-
-    def get_list(self):
-        api_url = f'{self.api_url}/tickers'
-        data = self._make_request(api_url)
-        tickers = data['tickers']
-        return [ticker['pair'] for ticker in tickers]
-
-    def get_info(self, assets):
-        raise NotImplementedError('Not available for this feed.') 
-
-    def get_prices(self, assets, currencies):
-        api_url = f'{self.api_url}/tickers'
-        data = self._make_request(api_url)
-        tickers = data['tickers']
-        assets = assets.upper().split(',')
-        currencies = currencies.upper().split(',')
-        pairs = {f'{asset}{currency}' for asset, currency in 
-                 product(assets, currencies)}
-        return [ticker for ticker in tickers if ticker['pair'] in pairs]
-
-
-class CryptoCompare(Datafeed):
+class CryptoCompare(Feed):
     '''Low level API for CryptoCompare.com
 
     TODO:
@@ -132,9 +53,9 @@ class CryptoCompare(Datafeed):
         asset = asset.upper()
         currency = currency.upper()
         start_date, end_date, freqstr, intervals = \
-            _validate_dates(start_date, end_date, freq)
+            dates_and_frequencies(start_date, end_date, freq)
         limit = min(intervals, self._interval_limit)
-        dates = date_range(start_date, end_date, timedelta(**{freqstr:limit}))
+        dates = date_range(start_date, end_date, **{freqstr:limit})
 
         data = []
         for start, end in zip(dates[:-1], dates[1:]):
@@ -197,14 +118,3 @@ class CryptoCompare(Datafeed):
         if 'Data' in data:
             data = data['Data']
         return data
-
-
-if __name__=='__main__':
-    luno = Luno()
-    print(luno.get_list())
-    print(luno.get_prices('XBT', 'ZAR'))
-    cc = CryptoCompare()
-    print(cc.get_list())
-    print(cc.get_info('BTC,ETH'))
-    print(cc.get_prices('BTC,ETH', 'USD,EUR'))
-    print(cc.get_historical_data('BTC,ETH', 'USD,EUR'))

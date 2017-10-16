@@ -7,9 +7,14 @@ import click
 from itertools import chain, product
 from collections import namedtuple
 import asyncio
+
 from streamz import Stream
 import attr
 
+# I don't like these * imports but they're required for the factory() methods
+# to work.
+from numismatic.feeds import *
+from numismatic.exchanges import *
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +71,10 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
-    from .datafeeds import Datafeed
+    
     state['cache_dir'] = cache_dir
     state['datafeed'] = \
-        Datafeed.factory(feed_name=feed, cache_dir=cache_dir,
+        Feed.factory(feed_name=feed, cache_dir=cache_dir,
                          requester=requester)
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
@@ -167,7 +172,6 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
            channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
     # FIXME: Use a factory function here
-    from .exchanges import BitfinexExchange, LunoExchange
     assets = ','.join(assets).split(',')
     currencies = ','.join(currencies).split(',')
     pairs = list(map(''.join, product(assets, currencies)))
@@ -175,7 +179,8 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
     subscriptions = state['subscriptions']
     if exchange=='bitfinex':
         for pair in pairs:
-            exchange = BitfinexExchange(output_stream=output_stream,
+            exchange = Exchange.factory(exchange_name='bitfinex',
+                                        output_stream=output_stream,
                                         raw_stream=raw_output,
                                         batch_size=batch_size)
             subscription = exchange.listen(pair, channel)
@@ -186,11 +191,12 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
                           config else '')
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
-        exchange = LunoExchange(output_stream=output_stream,
-                                raw_stream=raw_output,
-                                batch_size=batch_size,
-                                api_key_id=api_key_id,
-                                api_key_secret=api_key_secret)
+        exchange = Exchange.factory(exchange_name='luno',
+                                    output_stream=output_stream,
+                                    raw_stream=raw_output,
+                                    batch_size=batch_size,
+                                    api_key_id=api_key_id,
+                                    api_key_secret=api_key_secret)
         for pair in pairs:
             subscription = exchange.listen(pair)
             subscriptions[f'{pair}-{exchange}'] = subscription
