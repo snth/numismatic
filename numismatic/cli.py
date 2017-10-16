@@ -158,7 +158,7 @@ def tabulate(data):
 
 @coin.command()
 @click.option('--exchange', '-e', default='bitfinex',
-              type=click.Choice(['bitfinex', 'luno']))
+              type=click.Choice(['bitfinex', 'gdax', 'luno']))
 @click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
@@ -170,8 +170,7 @@ def tabulate(data):
               "to disk")
 # FIXME: The --channel and --api-key-* options are exchange specific and 
 #        should probably be handled differently.
-@click.option('--channel', '-C', default='trades',
-              type=click.Choice(['trades', 'ticker']))
+@click.option('--channel', '-C', default='trades', type=str)
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
@@ -181,12 +180,22 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
     # FIXME: Use a factory function here
     assets = ','.join(assets).split(',')
     currencies = ','.join(currencies).split(',')
-    pairs = list(map(''.join, product(assets, currencies)))
+    pairs = list(map('/'.join, product(assets, currencies)))
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
     if exchange=='bitfinex':
         for pair in pairs:
+            pair = pair.replace('/', '')
             exchange = Exchange.factory(exchange_name='bitfinex',
+                                        output_stream=output_stream,
+                                        raw_stream=raw_output,
+                                        raw_interval=raw_interval)
+            subscription = exchange.listen(pair, channel)
+            subscriptions[f'{pair}-{exchange}'] = subscription
+    elif exchange=='gdax':
+        for pair in pairs:
+            pair = pair.replace('/', '-')
+            exchange = Exchange.factory(exchange_name='gdax',
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
                                         raw_interval=raw_interval)
@@ -205,6 +214,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
                                     api_key_id=api_key_id,
                                     api_key_secret=api_key_secret)
         for pair in pairs:
+            pair = pair.replace('/', '')
             subscription = exchange.listen(pair)
             subscriptions[f'{pair}-{exchange}'] = subscription
     else:
