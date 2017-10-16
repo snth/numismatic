@@ -10,6 +10,8 @@ import asyncio
 from streamz import Stream
 import attr
 
+from numismatic.feeds import *
+from numismatic.exchanges import *
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +68,10 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
-    from .datafeeds import Datafeed
+    
     state['cache_dir'] = cache_dir
     state['datafeed'] = \
-        Datafeed.factory(feed_name=feed, cache_dir=cache_dir,
+        Feed.factory(feed_name=feed, cache_dir=cache_dir,
                          requester=requester)
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
@@ -167,7 +169,6 @@ def listen(state, exchange, assets, currencies, raw_output, batch_size,
            channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
     # FIXME: Use a factory function here
-    from .exchanges import BitfinexExchange, LunoExchange
     assets = ','.join(assets).split(',')
     currencies = ','.join(currencies).split(',')
     pairs = list(map(''.join, product(assets, currencies)))
