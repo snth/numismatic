@@ -29,8 +29,8 @@ class Feed(abc.ABC):
         self.requester = requester
         self.cache_dir = cache_dir
 
-    def _make_request(self, api_url, params=None):
-        response = self.requester.get(api_url, params=params)
+    def _make_request(self, api_url, params=None, headers=None):
+        response = self.requester.get(api_url, params=params, headers=headers)
         data = response.json()
         return data
 

@@ -30,8 +30,8 @@ class Requester:
     def __init__(self, **kwds):
         pass
 
-    def get(self, url, params=None):
-        response = requests.get(url, params=params)
+    def get(self, url, params=None, headers=None):
+        response = requests.get(url, params=params, headers=headers)
         return response
 
 
@@ -50,8 +50,8 @@ class CachingRequester(Requester):
             path /= urlencode(params)
         return path
 
-    def get(self, url, params=None, use_cache=True):
-        path = self._get_path(url, params=params)
+    def get(self, url, params=None, headers=None, use_cache=True):
+        path = self._get_path(url, params=params, headers=headers)
         if use_cache and path.exists():
             try:
                 return pickle.load(path.open('rb'))
