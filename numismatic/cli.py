@@ -178,36 +178,40 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
            channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
     # FIXME: Use a factory function here
+    exchange_name = exchange.lower()
     assets = ','.join(assets).split(',')
     currencies = ','.join(currencies).split(',')
     pairs = list(map('/'.join, product(assets, currencies)))
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
-    if exchange=='bitfinex':
+    if exchange_name=='bitfinex':
         for pair in pairs:
             pair = pair.replace('/', '')
-            exchange = Exchange.factory(exchange_name='bitfinex',
+            exchange = Exchange.factory(exchange_name=exchange_name,
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
                                         raw_interval=raw_interval)
             subscription = exchange.listen(pair, channel)
-            subscriptions[f'{pair}-{exchange}'] = subscription
-    elif exchange=='gdax':
+            subscriptions[f'{pair}-{exchange_name}'] = subscription
+    elif exchange_name=='gdax':
+        if channel=='trades':
+            # FIXME: handle this mapping in a better way
+            channel = 'ticker'
         for pair in pairs:
             pair = pair.replace('/', '-')
-            exchange = Exchange.factory(exchange_name='gdax',
+            exchange = Exchange.factory(exchange_name=exchange_name,
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
                                         raw_interval=raw_interval)
             subscription = exchange.listen(pair, channel)
-            subscriptions[f'{pair}-{exchange}'] = subscription
-    elif exchange=='luno':
+            subscriptions[f'{pair}-{exchange_name}'] = subscription
+    elif exchange_name=='luno':
         if api_key_id is None:
             api_key_id = (config['Luno'].get('api_key_id', '') if 'Luno' in
                           config else '')
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
-        exchange = Exchange.factory(exchange_name='luno',
+        exchange = Exchange.factory(exchange_name=exchange_name,
                                     output_stream=output_stream,
                                     raw_stream=raw_output,
                                     raw_interval=raw_interval,
@@ -216,7 +220,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
         for pair in pairs:
             pair = pair.replace('/', '')
             subscription = exchange.listen(pair)
-            subscriptions[f'{pair}-{exchange}'] = subscription
+            subscriptions[f'{pair}-{exchange_name}'] = subscription
     else:
         raise NotImplementedError()
 
@@ -262,15 +266,23 @@ def run(state, timeout):
     subscriptions = state['subscriptions']
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
-    completed, pending = \
-        loop.run_until_complete(asyncio.wait(subscriptions.values(),
-                                timeout=timeout))
-    logger.debug('cancelling ...')
-    for task in pending:
-        task.cancel()
-    logger.debug('finishing...')
-    loop.run_until_complete(asyncio.sleep(1))
-    logger.debug('done')
+    tasks = {name:asyncio.Task(sub) for name, sub in subscriptions.items()}
+    try:
+        completed, pending = \
+            loop.run_until_complete(asyncio.wait(tasks.values(), 
+                                    timeout=timeout))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        logger.debug('cancelling ...')
+        pending = {name:task for name, task in tasks.items() 
+                   if not task.done()}
+        for task_name, task in pending.items():
+            logger.debug(f'cancelling pending {task_name} ...')
+            task.cancel()
+        logger.debug('sleeping ...')
+        loop.run_until_complete(asyncio.sleep(1))
+        logger.debug('done')
 
 
 def write(data, file, sep='\n'):
