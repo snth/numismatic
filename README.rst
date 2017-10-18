@@ -1,7 +1,8 @@
 Numismatic - Coin Collecting for Digital Assets
 ===============================================
 
-|Join the chat at https://gitter.im/numismatic-chat/Lobby|
+|Join the chat at https://gitter.im/numismatic-chat/Lobby| |PyPI
+licence| |PyPI version| |Python versions| |PyPI format|
 
 Install
 -------
@@ -31,6 +32,8 @@ Run the ``coin`` script from anywhere and explore from there
 
     coin listen -a BTC,ETH,XMR,ZEC collect run
 
+    coin listen -e bitfinex -e gdax collect -t Trade run
+
 Contribute
 ----------
 
@@ -43,3 +46,11 @@ Contribute
 
 .. |Join the chat at https://gitter.im/numismatic-chat/Lobby| image:: https://badges.gitter.im/numismatic-chat/Lobby.svg
    :target: https://gitter.im/numismatic-chat/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+.. |PyPI licence| image:: https://img.shields.io/pypi/l/numismatic.svg
+   :target: 
+.. |PyPI version| image:: https://img.shields.io/pypi/v/numismatic.svg
+   :target: 
+.. |Python versions| image:: https://img.shields.io/pypi/pyversions/numismatic.svg
+   :target: 
+.. |PyPI format| image:: https://img.shields.io/pypi/format/numismatic.svg
+   :target: 

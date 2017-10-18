@@ -28,6 +28,8 @@ Run the `coin` script from anywhere and explore from there
 
     coin listen -a BTC,ETH,XMR,ZEC collect run
 
+    coin listen -e bitfinex -e gdax collect -t Trade run
+
 ## Contribute
 
     git clone https://github.com/snth/numismatic.git
