@@ -54,7 +54,8 @@ class BitfinexExchange(Exchange):
                 msg = self._handle_packet(packet, symbol)
             except asyncio.CancelledError:
                 ## unsubscribe
-                confirmation = await self._unsubscribe(ws, channel_info)
+                confirmation = \
+                    await asyncio.shield(self._unsubscribe(ws, channel_info))
 
     async def _subscribe(self, ws, symbol, channel):
         msg = json.dumps(dict(event='subscribe', channel=channel,
