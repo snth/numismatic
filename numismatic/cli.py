@@ -217,11 +217,11 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 
 
 @coin.command()
+@click.option('--output', '-o', default='-', type=click.Path())
 @click.option('--filter', '-f', default='', type=str, multiple=True)
 @click.option('--type', '-t', default=None, multiple=True,
               type=click.Choice(['None', 'Trade', 'Heartbeat', 'LimitOrder',
                                  'CancelOrder']))
-@click.option('--output', '-o', default='-', type=click.File('w'))
 @click.option('--text', 'format', flag_value='text', default=True)
 @click.option('--json', 'format', flag_value='json')
 @click.option('--interval', '-i', default=None, type=float)
@@ -230,7 +230,7 @@ def collect(state, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
     output_stream = state['output_stream']
     from .collectors import FileCollector
-    collector = FileCollector(source_stream=output_stream, file=output, 
+    collector = FileCollector(source_stream=output_stream, path=output, 
                               format=format, types=type, filters=filter,
                               interval=interval)
     # state['collectors'].append(collector)

@@ -8,12 +8,11 @@ from .base import Collector
 @attr.s
 class FileCollector(Collector):
 
-    file = attr.ib(default=sys.stdout)
+    path = attr.ib(default='-')
     format = attr.ib(default='text')
     interval = attr.ib(default=None)
 
     def __attrs_post_init__(self):
-        print(self.__class__.__name__)
         if self.format=='text':
             self.source_stream = self.source_stream.map(
                 lambda ev: str(ev)+'\n')
@@ -32,6 +31,11 @@ class FileCollector(Collector):
         self.source_stream.sink(self.write)
 
     def write(self, data):
-        for datum in data:
-            self.file.write(datum)
-        self.file.flush()
+        file = sys.stdout if self.path=='-' else open(self.path, 'at')
+        try:
+            for datum in data:
+                file.write(datum)
+            file.flush()
+        finally:
+            if self.path!='-':
+                file.close()

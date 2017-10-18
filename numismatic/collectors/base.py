@@ -9,7 +9,6 @@ class Collector:
     filters = attr.ib(default=attr.Factory(list))
 
     def __attrs_post_init__(self):
-        print(self.__class__.__name__)
         if self.types:
             self.source_stream = self.source_stream.filter(
                 lambda ev: ev.__class__.__name__ in set(self.types))
