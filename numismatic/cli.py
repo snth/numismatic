@@ -222,26 +222,17 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
               type=click.Choice(['None', 'Trade', 'Heartbeat', 'LimitOrder',
                                  'CancelOrder']))
 @click.option('--output', '-o', default='-', type=click.File('w'))
-@click.option('--events', 'format', flag_value='events', default=True)
+@click.option('--text', 'format', flag_value='text', default=True)
 @click.option('--json', 'format', flag_value='json')
 @pass_state
 def collect(state, filter, type, output, format):
     'Collect events and write them to an output sink'
     # TODO: The filter logic here should be moved to the collectors module
     output_stream = state['output_stream']
-    if type:
-        output_stream = output_stream.filter(
-            lambda ev: ev.__class__.__name__ in set(type))
-    filters = filter
-    for filter in filters:
-        output_stream = output_stream.filter(
-            lambda x: eval(filter, attr.asdict(x)))
-    if format=='json':
-        output_stream = output_stream.map(lambda ev: ev.json())
-    sink = (output_stream
-            .map(lambda ev: output.write(str(ev)+'\n'))
-            .map(lambda ev: output.flush())
-            )
+    from .collectors import FileCollector
+    collector = FileCollector(source_stream=output_stream, file=output, 
+                              format=format, types=type, filters=filter)
+    # state['collectors'].append(collector)
 
 
 @coin.command()
