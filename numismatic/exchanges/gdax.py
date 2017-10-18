@@ -2,6 +2,7 @@ import logging
 import asyncio
 import json
 import time
+from datetime import datetime
 import gzip
 
 from streamz import Stream
@@ -84,20 +85,23 @@ class GDAXExchange(Exchange):
         msg = json.loads(packet)
         if not isinstance(msg, dict):
             raise TypeError('msg: {msg}'.format(msg=msg))
-        elif 'type' in msg and msg['type']=='heartbeat':
+        if 'product_id' in msg:
             symbol = msg['product_id'].replace('-', '')
+        if 'time' in msg:
+            dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            timestamp = dt.timestamp()
+
+        if 'type' in msg and msg['type']=='heartbeat':
             msg = Heartbeat(exchange=self.exchange, symbol=symbol,
-                            timestamp=msg['time'])
+                            timestamp=timestamp)
             self.output_stream.emit(msg)
         elif 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
-            symbol = msg['product_id'].replace('-', '')
             sign = -1 if ('side' in msg and msg['side']=='sell') else 1
             price = msg['price']
             volume = sign * msg['last_size'] if 'last_size' in msg else 0
             trade_id = msg['trade_id']
-            time_str = msg['time']
             msg = Trade(exchange=self.exchange, symbol=symbol, 
-                        timestamp=msg['time'], price=price, volume=volume,
+                        timestamp=timestamp, price=price, volume=volume,
                         id=trade_id)
             self.output_stream.emit(msg)
         elif isinstance(msg, dict):
