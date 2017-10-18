@@ -253,13 +253,12 @@ def collect(state, filter, type, output, format):
 
 
 @coin.command()
-@click.option('--timeout', '-t', default=15)
+@click.option('--timeout', '-t', default=0)
 @pass_state
 def run(state, timeout):
     """
-    Run the asyncio event loop for a set amount of time. Defaults to
-    15 seconds. Set to 0 to run indefinitely.
-    """
+    Run the asyncio event loop for a set amount of time. Set to 0 to run 
+    indefinitely.  Default is no-timeout."""
     if not timeout:
         # Allow to run indefinitely if timeout==0
         timeout = None
