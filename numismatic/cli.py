@@ -224,14 +224,15 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 @click.option('--output', '-o', default='-', type=click.File('w'))
 @click.option('--text', 'format', flag_value='text', default=True)
 @click.option('--json', 'format', flag_value='json')
+@click.option('--interval', '-i', default=None, type=float)
 @pass_state
-def collect(state, filter, type, output, format):
+def collect(state, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
-    # TODO: The filter logic here should be moved to the collectors module
     output_stream = state['output_stream']
     from .collectors import FileCollector
     collector = FileCollector(source_stream=output_stream, file=output, 
-                              format=format, types=type, filters=filter)
+                              format=format, types=type, filters=filter,
+                              interval=interval)
     # state['collectors'].append(collector)
 
 
