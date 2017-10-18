@@ -40,6 +40,7 @@ class FileCollector(Collector):
         self.source_stream.sink(self.write)
 
     def write(self, data):
+        # TODO: Use aiofiles for non-blocking IO here
         file = self._opener()
         try:
             for datum in data:

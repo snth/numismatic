@@ -64,6 +64,8 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin listen collect run
 
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
+
+        coin listen -e bitfinex -e gdax collect run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
@@ -175,7 +177,10 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
     pairs = list(map('/'.join, product(assets, currencies)))
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
+    # FIXME: each pair should get a separate stream which we should keep track
+    #        of in state['streams'].
     if exchange_name=='bitfinex':
+        # FIXME: Move the pairs handling into the Exchange code
         for pair in pairs:
             pair = pair.replace('/', '')
             exchange = Exchange.factory(exchange_name=exchange_name,
