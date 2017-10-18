@@ -179,8 +179,8 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
     'Listen to live events from an exchange'
     # FIXME: Use a factory function here
     exchange_name = exchange.lower()
-    assets = ','.join(assets).split(',')
-    currencies = ','.join(currencies).split(',')
+    assets = ','.join(assets).upper().split(',')
+    currencies = ','.join(currencies).upper().split(',')
     pairs = list(map('/'.join, product(assets, currencies)))
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
@@ -227,8 +227,9 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 
 @coin.command()
 @click.option('--filter', '-f', default='', type=str, multiple=True)
-@click.option('--type', '-t', default=None,
-              type=click.Choice(['None', 'Trade', 'Heartbeat']))
+@click.option('--type', '-t', default=None, multiple=True,
+              type=click.Choice(['None', 'Trade', 'Heartbeat', 'LimitOrder',
+                                 'CancelOrder']))
 @click.option('--output', '-o', default='-', type=click.File('w'))
 @click.option('--events', 'format', flag_value='events', default=True)
 @click.option('--json', 'format', flag_value='json')
@@ -239,7 +240,7 @@ def collect(state, filter, type, output, format):
     output_stream = state['output_stream']
     if type:
         output_stream = output_stream.filter(
-            lambda ev: ev.__class__.__name__==type)
+            lambda ev: ev.__class__.__name__ in set(type))
     filters = filter
     for filter in filters:
         output_stream = output_stream.filter(
