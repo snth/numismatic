@@ -1,4 +1,6 @@
 import sys
+import gzip
+from functools import partial
 
 import attr
 
@@ -13,6 +15,13 @@ class FileCollector(Collector):
     interval = attr.ib(default=None)
 
     def __attrs_post_init__(self):
+        if self.path=='-':
+            self._opener = lambda: sys.stdout
+        elif self.path.endswith('.gz'):
+            self._opener = partial(gzip.open, self.path, mode='at')
+        else:
+            self._opener = partial(open, self.path, mode='at')
+
         if self.format=='text':
             self.source_stream = self.source_stream.map(
                 lambda ev: str(ev)+'\n')
@@ -31,7 +40,7 @@ class FileCollector(Collector):
         self.source_stream.sink(self.write)
 
     def write(self, data):
-        file = sys.stdout if self.path=='-' else open(self.path, 'at')
+        file = self._opener()
         try:
             for datum in data:
                 file.write(datum)
