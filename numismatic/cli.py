@@ -1,20 +1,18 @@
 import logging
-from appdirs import user_config_dir
 import click
 from itertools import chain, product
 from collections import namedtuple
 import asyncio
 
-from appdirs import user_config_dir
 from tornado.platform.asyncio import AsyncIOMainLoop
 from streamz import Stream
-from .libs.config import get_config
 import attr
 
 # I don't like these * imports but they're required for the factory() methods
 # to work.
-from numismatic.feeds import *
-from numismatic.exchanges import *
+from .feeds import *
+from .exchanges import *
+from .libs.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +169,6 @@ def tabulate(data):
 def listen(state, exchange, assets, currencies, raw_output, raw_interval, 
            channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
-    # FIXME: Use a factory function here
     exchange_name = exchange.lower()
     assets = ','.join(assets).upper().split(',')
     currencies = ','.join(currencies).upper().split(',')

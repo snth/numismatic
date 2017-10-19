@@ -4,7 +4,8 @@ from .base import Feed
 from ..libs.config import get_config
 
 class BraveNewCoin(Feed):
-    config = get_config()['bravenewcoin']
+    config = get_config()['bravenewcoin'] if 'bravenewcoin' in get_config() \
+        else {}
     api_key_id = (config.get('api_key_id', '') if config else '')
     api_key_secret = (config.get('api_key_secret', '') if config else '')
     api_url = 'https://bravenewcoin-v1.p.mashape.com/'

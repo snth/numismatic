@@ -3,8 +3,7 @@ import os
 from configparser import ConfigParser
 
 def get_config():
-    cwd = os.getcwd()
-    for config_file in [Path(cwd) / '.coinrc']:
+    for config_file in [Path(os.environ['HOME']) / '.coinrc']:
       config = ConfigParser()
       if config_file.exists():
           config.read(config_file)
