@@ -61,21 +61,19 @@ class LunoExchange(Exchange):
         super()._handle_packet(packet, symbol)
         order_book = json.loads(packet)
         if 'asks' in order_book:
-            sign = -1
             for order in order_book['asks']:
                 id = order['id']
-                volume = float(order['volume'])
-                price = sign * float(order['price'])
+                volume = -1 * float(order['volume'])
+                price = float(order['price'])
                 order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
                                     timestamp=timestamp, price=price,
                                     volume=volume, id=id)
                 self.output_stream.emit(order_ev)
         if 'bids' in order_book:
-            sign = 1
             for order in order_book['bids']:
                 id = order['id']
                 volume = float(order['volume'])
-                price = sign * float(order['price'])
+                price = float(order['price'])
                 order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
                                     timestamp=timestamp, price=price,
                                     volume=volume, id=id)
