@@ -3,7 +3,7 @@ from .base import Feed
 from ..libs.config import get_config
 
 
-class BraveNewCoin(Feed):
+class BraveNewCoinFeed(Feed):
 
     api_url = 'https://bravenewcoin-v1.p.mashape.com/'
 
