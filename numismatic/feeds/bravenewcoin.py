@@ -18,9 +18,9 @@ class BraveNewCoin(Feed):
       data = self._make_request(api_url, headers=self.headers)
       response = []
 
-      for json_dict in data['digital_currencies']:
-        for key, value in json_dict.items():
-          response.insert(0, key)
+      response = [key 
+                  for json_dict in data['digital_currencies']
+                  for key, value in json_dict.items()]
 
       return response
 
@@ -28,6 +28,19 @@ class BraveNewCoin(Feed):
     def get_info(self, assets):
       raise NotImplementedError('Not implemented yet') 
 
-    #TODO implement this
     def get_prices(self, assets, currencies):
-      raise NotImplementedError('Not implemented yet')
+      """Not the most efficient method as BNC does not
+      allow a list for input. So we iterate over each
+      asset and currency and make separate calls"""
+      response = []
+      for asset in assets.split(','):
+        for currency in currencies.split(','):
+          api_url = f'{self.api_url}/ticker/?coin={asset}&show={currency}'
+          data = self._make_request(api_url, headers=self.headers)
+          if data['success'] != True:
+            continue
+
+          response.insert(len(response), 
+            {'asset':asset, 'currency':currency, 'price': float(data['last_price'])})
+      
+      return response
