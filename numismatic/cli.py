@@ -29,7 +29,7 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
 
 @click.group(chain=True)
 @click.option('--feed', '-f', default='cryptocompare',
-              type=click.Choice(['cryptocompare', 'luno', 'bravenewcoin']))
+              type=click.Choice(Feed._get_subclasses().keys()))
 @click.option('--cache-dir', '-d', default=None)
 @click.option('--requester', '-r', default='base',
               type=click.Choice(['base', 'caching']))
@@ -150,7 +150,7 @@ def tabulate(data):
 
 @coin.command()
 @click.option('--exchange', '-e', default='bitfinex',
-              type=click.Choice(['bitfinex', 'gdax', 'luno']))
+              type=click.Choice(Exchange._get_subclasses().keys()))
 @click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
@@ -220,7 +220,8 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 
 
 @coin.command()
-@click.option('--collector', '-c', default='file', type=click.Choice(['file']))
+@click.option('--collector', '-c', default='file', 
+              type=click.Choice(Collector._get_subclasses().keys()))
 @click.option('--output', '-o', default='-', type=click.Path())
 @click.option('--filter', '-f', default='', type=str, multiple=True)
 @click.option('--type', '-t', default=None, multiple=True,
