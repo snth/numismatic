@@ -45,7 +45,6 @@ class OrderBook:
     def best_bid(self):
         return -self.bids[0] if self.bids else float('nan')
 
-
     def best_ask(self):
         return self.asks[0] if self.asks else float('nan')
 
