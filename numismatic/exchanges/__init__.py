@@ -13,7 +13,6 @@ def exchange_factory(cls, exchange_name, *args, **kwargs):
     exchange_name = exchange_name.lower()
     subclasses = {subcls.__name__.lower()[:-len('Exchange')]:subcls 
                     for subcls in cls.__subclasses__()}
-
     subclass = subclasses[exchange_name]
     exchange = subclass(*args, **kwargs)
     return exchange

@@ -8,8 +8,7 @@ from tornado.platform.asyncio import AsyncIOMainLoop
 from streamz import Stream
 import attr
 
-# I don't like these * imports but they're required for the factory() methods
-# to work.
+from .collectors import Collector
 from .feeds import Feed
 from .exchanges import Exchange
 from .libs.config import get_config
@@ -171,7 +170,7 @@ def tabulate(data):
 def listen(state, exchange, assets, currencies, raw_output, raw_interval, 
            channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
-    exchange_name = exchange.lower()
+    exchange_name = exchange
     assets = ','.join(assets).upper().split(',')
     currencies = ','.join(currencies).upper().split(',')
     pairs = list(map('/'.join, product(assets, currencies)))
@@ -222,6 +221,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 
 
 @coin.command()
+@click.option('--collector', '-c', default='file', type=click.Choice(['file']))
 @click.option('--output', '-o', default='-', type=click.Path())
 @click.option('--filter', '-f', default='', type=str, multiple=True)
 @click.option('--type', '-t', default=None, multiple=True,
@@ -231,13 +231,14 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 @click.option('--json', 'format', flag_value='json')
 @click.option('--interval', '-i', default=None, type=float)
 @pass_state
-def collect(state, filter, type, output, format, interval):
+def collect(state, collector, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
     output_stream = state['output_stream']
-    from .collectors import FileCollector
-    collector = FileCollector(source_stream=output_stream, path=output, 
-                              format=format, types=type, filters=filter,
-                              interval=interval)
+    collector_name = collector
+    collector = Collector.factory(collector_name=collector_name,
+                                  source_stream=output_stream, path=output,
+                                  format=format, types=type, filters=filter,
+                                  interval=interval)
     # state['collectors'].append(collector)
 
 

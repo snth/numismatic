@@ -13,7 +13,6 @@ def feed_factory(cls, feed_name, *args, **kwargs):
     feed_name = feed_name.lower()
     subclasses = {subcls.__name__.lower():subcls for subcls in 
                     cls.__subclasses__()}
-
     subclass = subclasses[feed_name]
     feed = subclass(*args, **kwargs)
     return feed
