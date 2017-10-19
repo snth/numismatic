@@ -6,6 +6,7 @@ from .luno import LunoExchange
 __all__ = ["Exchange", "BitfinexExchange", "GDAXExchange", "LunoExchange"]
 
 
-from ..libs.utils import make_subclass_factory
+from ..libs.utils import make_get_subclasses, subclass_factory
 
-setattr(Exchange, 'factory', make_subclass_factory('Exchange'))
+setattr(Exchange, '_get_subclasses', make_get_subclasses('Exchange'))
+setattr(Exchange, 'factory', subclass_factory)

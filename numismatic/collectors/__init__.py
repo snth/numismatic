@@ -6,6 +6,7 @@ from .file import FileCollector
 __all__ = ["Collector", "FileCollector"]
 
 
-from ..libs.utils import make_subclass_factory
+from ..libs.utils import make_get_subclasses, subclass_factory
 
-setattr(Collector, 'factory', make_subclass_factory('Collector'))
+setattr(Collector, '_get_subclasses', make_get_subclasses('Collector'))
+setattr(Collector, 'factory', subclass_factory)

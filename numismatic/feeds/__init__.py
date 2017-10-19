@@ -6,6 +6,7 @@ from .luno import LunoFeed
 __all__ = ["Feed", "CryptoCompare", "Luno", "BraveNewCoin"]
 
 
-from ..libs.utils import make_subclass_factory
+from ..libs.utils import make_get_subclasses, subclass_factory
 
-setattr(Feed, 'factory', make_subclass_factory('Feed'))
+setattr(Feed, '_get_subclasses', make_get_subclasses('Feed'))
+setattr(Feed, 'factory', subclass_factory)
