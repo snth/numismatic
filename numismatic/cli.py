@@ -68,9 +68,8 @@ def coin(state, feed, cache_dir, requester, log_level):
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
-    state['datafeed'] = \
-        Feed.factory(feed_name=feed, cache_dir=cache_dir,
-                         requester=requester)
+    state['datafeed'] = Feed.factory(feed, cache_dir=cache_dir,
+                                     requester=requester)
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
 
@@ -182,7 +181,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
         # FIXME: Move the pairs handling into the Exchange code
         for pair in pairs:
             pair = pair.replace('/', '')
-            exchange = Exchange.factory(exchange_name=exchange_name,
+            exchange = Exchange.factory(exchange_name,
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
                                         raw_interval=raw_interval)
@@ -194,7 +193,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
             channel = 'ticker'
         for pair in pairs:
             pair = pair.replace('/', '-')
-            exchange = Exchange.factory(exchange_name=exchange_name,
+            exchange = Exchange.factory(exchange_name,
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
                                         raw_interval=raw_interval)
@@ -206,7 +205,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
                           config else '')
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
-        exchange = Exchange.factory(exchange_name=exchange_name,
+        exchange = Exchange.factory(exchange_name,
                                     output_stream=output_stream,
                                     raw_stream=raw_output,
                                     raw_interval=raw_interval,
@@ -235,10 +234,9 @@ def collect(state, collector, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
     output_stream = state['output_stream']
     collector_name = collector
-    collector = Collector.factory(collector_name=collector_name,
-                                  source_stream=output_stream, path=output,
-                                  format=format, types=type, filters=filter,
-                                  interval=interval)
+    collector = Collector.factory(collector_name, source_stream=output_stream,
+                                  path=output, format=format, types=type,
+                                  filters=filter, interval=interval)
     # state['collectors'].append(collector)
 
 

@@ -48,3 +48,19 @@ def dates_and_frequencies(start_date, end_date, freq):
     interval_time = timedelta(**{freqstr:1})
     intervals = math.ceil((end_date-start_date)/interval_time)
     return start_date, end_date, freqstr, intervals
+
+def make_subclass_factory(base_class_name):
+    
+    @classmethod
+    def subclass_factory(cls, class_name, *args, **kwargs):
+        if not isinstance(class_name, str):
+            raise TypeError(f'"class_name" must be a str. '
+                            'Not {type(class_name)}.')
+        class_name = class_name.lower()
+        subclasses = {subcls.__name__.lower()[:-len(base_class_name)]:subcls 
+                        for subcls in cls.__subclasses__()}
+        subclass = subclasses[class_name]
+        instance = subclass(*args, **kwargs)
+        return instance
+
+    return subclass_factory
