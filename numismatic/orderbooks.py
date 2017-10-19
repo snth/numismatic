@@ -1,6 +1,7 @@
 from functools import partial
 from itertools import chain
 from collections import defaultdict
+import bisect
 
 import attr
 
@@ -11,47 +12,65 @@ from .libs.events import LimitOrder, CancelOrder
 class OrderBook:
 
     orders = attr.ib(default=attr.Factory(dict))
-    bids = attr.ib(default=attr.Factory(partial(defaultdict, list)))
-    asks = attr.ib(default=attr.Factory(partial(defaultdict, list)))
+    levels = attr.ib(default=attr.Factory(partial(defaultdict, list)))
+    bids = attr.ib(default=attr.Factory(list))
+    asks = attr.ib(default=attr.Factory(list))
 
     def update(self, order):
         if isinstance(order, LimitOrder):
             self.orders[order.id] = order
-            levels = self.bids if order.volume>0 else self.asks
-            level = levels[order.price]
+            level = self.levels[order.price]
+            if not level:
+                # a new level so need to update bids or asks
+                side = self.bids if order.volume>0 else self.asks
+                price = -order.price if order.volume>0 else order.price
+                position = bisect.bisect(side, price)
+                side.insert(position, price)
             level.append(order.id)
         elif isinstance(order, CancelOrder):
             order = self.orders[order.id]
             del self.orders[order.id]
-            levels = self.bids if order.volume>0 else self.asks
-            level = levels[order.price]
+            level = self.levels[order.price]
             level.remove(order.id)
             if not level:
-                del levels[order.price]
+                del self.levels[order.price]
+                side = self.bids if order.volume>0 else self.asks
+                price = -order.price if order.volume>0 else order.price
+                position = bisect.bisect(side, price)
+                side.pop(position-1)
         else:
             raise NotImplementedError(f'order={order}')
 
     def best_bid(self):
-        return max(self.bids) if self.bids else float('nan')
+        return -self.bids[0] if self.bids else float('nan')
 
 
     def best_ask(self):
-        return min(self.asks) if self.asks else float('nan')
+        return self.asks[0] if self.asks else float('nan')
 
 
 if __name__=='__main__':
     import time
-    prices = [1, 10, 2, 2, 9, 9]
+    import random
+    random.seed(5)
+    prices = [random.randint(-5, 5) for i in range(10)]
+    print(prices)
+    mid_price = 0
     ob = OrderBook()
     for i, p in enumerate(prices):
         # Treat orders below 5 as bids and above as asks
         o = LimitOrder('test', 'BTCUSD', time.time(), p, 
-                       (1 if p<5 else -1)*10*p , i)
+                       (1 if p<mid_price else -1)*10*i , i)
+        print(o)
         ob.update(o)
-        print('\n', ob.best_bid(), ob.best_ask())
         print(ob)
+        print(ob.best_bid(), ob.best_ask())
+        print()
     for i, p in enumerate(prices):
-        c = CancelOrder('test', 'BTCUSD', time.time(), i)
-        ob.update(c)
-        print('\n', ob.best_bid(), ob.best_ask())
+        o = CancelOrder('test', 'BTCUSD', time.time(), i)
+        print(o)
+        ob.update(o)
         print(ob)
+        print(ob.best_bid(), ob.best_ask())
+        print()
+    print(prices)
