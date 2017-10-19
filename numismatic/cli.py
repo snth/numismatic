@@ -238,7 +238,6 @@ def collect(state, collector, filter, type, output, format, interval):
     collector = Collector.factory(collector_name, source_stream=output_stream,
                                   path=output, format=format, types=type,
                                   filters=filter, interval=interval)
-    # state['collectors'].append(collector)
 
 
 @coin.command()

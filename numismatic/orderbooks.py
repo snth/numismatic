@@ -39,7 +39,8 @@ class OrderBook:
                 position = bisect.bisect(side, price)
                 side.pop(position-1)
         else:
-            raise NotImplementedError(f'order={order}')
+            raise NotImplementedError(type(order))
+        return self
 
     def best_bid(self):
         return -self.bids[0] if self.bids else float('nan')
@@ -47,6 +48,9 @@ class OrderBook:
 
     def best_ask(self):
         return self.asks[0] if self.asks else float('nan')
+
+    def mid_price(self):
+        return (self.best_bid()+self.best_ask())/2
 
 
 if __name__=='__main__':
