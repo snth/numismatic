@@ -11,26 +11,23 @@ from .libs.events import LimitOrder, CancelOrder
 class OrderBook:
 
     orders = attr.ib(default=attr.Factory(dict))
-    levels = attr.ib(default=attr.Factory(partial(defaultdict, list)))
-    bids = attr.ib(default=attr.Factory(list))
-    asks = attr.ib(default=attr.Factory(list))
+    bids = attr.ib(default=attr.Factory(partial(defaultdict, list)))
+    asks = attr.ib(default=attr.Factory(partial(defaultdict, list)))
 
     def update(self, order):
         if isinstance(order, LimitOrder):
             self.orders[order.id] = order
-            level = self.levels[order.price]
+            levels = self.bids if order.volume>0 else self.asks
+            level = levels[order.price]
             level.append(order.id)
-            side = self.bids if order.volume>0 else self.asks
-            side.append(order.price)
         elif isinstance(order, CancelOrder):
             order = self.orders[order.id]
             del self.orders[order.id]
-            level = self.levels[order.price]
+            levels = self.bids if order.volume>0 else self.asks
+            level = levels[order.price]
             level.remove(order.id)
             if not level:
-                del self.levels[order.price]
-            side = self.bids if order.volume>0 else self.asks
-            side.remove(order.price)
+                del levels[order.price]
         else:
             raise NotImplementedError(f'order={order}')
 
