@@ -1,2 +1,2 @@
 from .base import Feed
-__all__ = ["Feed", "cryptocompare", "luno"]
+__all__ = ["Feed", "cryptocompare", "luno", "bravenewcoin"]

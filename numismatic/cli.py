@@ -1,7 +1,5 @@
 import logging
-from configparser import ConfigParser
-from pathlib import Path
-import os
+from appdirs import user_config_dir
 import click
 from itertools import chain, product
 from collections import namedtuple
@@ -10,6 +8,7 @@ import asyncio
 from appdirs import user_config_dir
 from tornado.platform.asyncio import AsyncIOMainLoop
 from streamz import Stream
+from .libs.config import get_config
 import attr
 
 # I don't like these * imports but they're required for the factory() methods
@@ -22,11 +21,7 @@ logger = logging.getLogger(__name__)
 AsyncIOMainLoop().install()
 
 
-config = ConfigParser()
-for config_file in [Path(os.environ['HOME']) / '.coinrc']:
-    # Could add other paths like: Path(user_config_dir()) / 'numismatic.ini'
-    if config_file.exists():
-        config.read(config_file)
+config = get_config()
 
 
 DEFAULT_ASSETS = ['BTC']
@@ -37,7 +32,7 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
 
 @click.group(chain=True)
 @click.option('--feed', '-f', default='cryptocompare',
-              type=click.Choice(['cryptocompare', 'luno']))
+              type=click.Choice(['cryptocompare', 'luno', 'bravenewcoin']))
 @click.option('--cache-dir', '-d', default=None)
 @click.option('--requester', '-r', default='base',
               type=click.Choice(['base', 'caching']))
@@ -73,7 +68,6 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
-    
     state['cache_dir'] = cache_dir
     state['datafeed'] = \
         Feed.factory(feed_name=feed, cache_dir=cache_dir,
