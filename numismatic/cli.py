@@ -10,8 +10,8 @@ import attr
 
 # I don't like these * imports but they're required for the factory() methods
 # to work.
-from .feeds import *
-from .exchanges import *
+from .feeds import Feed
+from .exchanges import Exchange
 from .libs.config import get_config
 
 logger = logging.getLogger(__name__)

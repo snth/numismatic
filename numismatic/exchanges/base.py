@@ -21,19 +21,6 @@ class Exchange(abc.ABC):
     raw_stream = attr.ib(default=None)
     raw_interval = attr.ib(default=1)
 
-    @classmethod
-    def factory(cls, exchange_name, *args, **kwargs):
-        if not isinstance(exchange_name, str):
-            raise TypeError(f'"exchange_name" must be a str. '
-                            'Not {type(exchange_name)}.')
-        exchange_name = exchange_name.lower()
-        subclasses = {subcls.__name__.lower()[:-len('Exchange')]:subcls 
-                      for subcls in cls.__subclasses__()}
-
-        subclass = subclasses[exchange_name]
-        exchange = subclass(*args, **kwargs)
-        return exchange
-
     @abc.abstractmethod
     async def listen(self, symbol):
         if self.raw_stream is not None:

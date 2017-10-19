@@ -1,7 +1,7 @@
-from itertools import product
-import attr
 from .base import Feed
+
 from ..libs.config import get_config
+
 
 class BraveNewCoin(Feed):
 

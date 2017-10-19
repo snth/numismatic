@@ -12,6 +12,7 @@ from ..libs.utils import date_range, make_list_str, to_datetime, \
 
 logger = logging.getLogger(__name__)
 
+
 class CryptoCompare(Feed):
     '''Low level API for CryptoCompare.com
 
