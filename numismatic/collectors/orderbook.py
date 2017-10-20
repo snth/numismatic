@@ -17,6 +17,7 @@ class OrderBookCollector(Collector):
     order_book = attr.ib(default=attr.Factory(OrderBook))
 
     def __attrs_post_init__(self):
+        super().__attrs_post_init__()
         if self.path=='-':
             self._opener = lambda: sys.stdout
         elif self.path.endswith('.gz'):
