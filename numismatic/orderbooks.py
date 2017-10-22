@@ -12,18 +12,22 @@ class OrderBook:
     asks = attr.ib(default=attr.Factory(PriorityQueue))
 
     def update(self, order):
-        if isinstance(order, LimitOrder):
-            side = self.bids if order.volume>0 else self.asks
-            price = -order.price if order.volume>0 else order.price
-            side.add(order.id, price)
-            self.orders[order.id] = order
-        elif isinstance(order, CancelOrder):
-            order = self.orders[order.id]
-            side = self.bids if order.volume>0 else self.asks
-            side.remove(order.id)
-            del self.orders[order.id]
-        else:
-            raise NotImplementedError(type(order))
+        try:
+            if isinstance(order, LimitOrder):
+                side = self.bids if order.volume>0 else self.asks
+                price = -order.price if order.volume>0 else order.price
+                side.add(order.id, price)
+                self.orders[order.id] = order
+            elif isinstance(order, CancelOrder):
+                order = self.orders[order.id]
+                side = self.bids if order.volume>0 else self.asks
+                side.remove(order.id)
+                del self.orders[order.id]
+            else:
+                raise NotImplementedError(type(order))
+        except KeyError as e:
+            print(order)
+            print(e)
         return self
 
     @property
