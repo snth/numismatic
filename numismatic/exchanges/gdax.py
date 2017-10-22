@@ -9,7 +9,8 @@ import attr
 import websockets
 
 from .base import Exchange
-from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
+from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder, \
+    MarketDepthUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -89,25 +90,49 @@ class GDAXExchange(Exchange):
         if 'time' in msg:
             dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
             timestamp = dt.timestamp()
+        else:
+            timestamp = time.time()
 
         if 'type' in msg and msg['type']=='heartbeat':
-            msg = Heartbeat(exchange=self.exchange, symbol=symbol,
-                            timestamp=timestamp)
-            self.output_stream.emit(msg)
+            event = Heartbeat(exchange=self.exchange, symbol=symbol,
+                              timestamp=timestamp)
+            self.output_stream.emit(event)
         elif 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
             sign = -1 if ('side' in msg and msg['side']=='sell') else 1
             price = msg['price']
             volume = sign * msg['last_size'] if 'last_size' in msg else 0
             trade_id = msg['trade_id']
-            msg = Trade(exchange=self.exchange, symbol=symbol, 
-                        timestamp=timestamp, price=price, volume=volume,
-                        id=trade_id)
-            self.output_stream.emit(msg)
+            event = Trade(exchange=self.exchange, symbol=symbol, 
+                          timestamp=timestamp, price=price, volume=volume,
+                          id=trade_id)
+            self.output_stream.emit(event)
+        elif 'type' in msg and msg['type']=='snapshot':
+            for price, volume in msg['bids']:
+                event = MarketDepthUpdate(exchange=self.exchange,
+                                          symbol=symbol, timestamp=timestamp,
+                                          price=float(price),
+                                          volume=float(volume))
+                self.output_stream.emit(event)
+            for price, volume in msg['asks']:
+                event = MarketDepthUpdate(exchange=self.exchange,
+                                          symbol=symbol, timestamp=timestamp,
+                                          price=float(price), 
+                                          volume=-float(volume))
+                self.output_stream.emit(event)
+        elif 'type' in msg and msg['type']=='l2update':
+            for side, price, size in msg['changes']:
+                volume = float(size) if side=='buy' else -float(size)
+                event = MarketDepthUpdate(exchange=self.exchange,
+                                          symbol=symbol, timestamp=timestamp,
+                                          price=float(price), 
+                                          volume=volume)
+                self.output_stream.emit(event)
         elif isinstance(msg, dict):
-            self.output_stream.emit(msg)
+            event = msg
+            self.output_stream.emit(event)
         else:
             raise NotImplementedError(msg)
-        return msg
+        return event
 
 
 if __name__=='__main__':
@@ -119,7 +144,7 @@ if __name__=='__main__':
     printer = output_stream.map(print)
 
     bfx = GDAXExchange(output_stream=output_stream)
-    bfx_btc = bfx.listen('BTC-USD', 'ticker,heartbeat')
+    bfx_btc = bfx.listen('BTC-USD', 'level2')
 
     loop = asyncio.get_event_loop()
     future = asyncio.wait([bfx_btc], timeout=15)
