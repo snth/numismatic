@@ -42,6 +42,22 @@ class PriorityQueue:
             heappop(self._heap)
         return not self._heap
 
+    def copy(self):
+        pq = self.__class__()
+        pq._heap = self._heap[:]
+        pq._entry_finder = self._entry_finder.copy()
+        return pq
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            return self.pop()
+        except KeyError:
+            raise StopIteration
+
+
 
 if __name__=='__main__':
     pq = PriorityQueue()
@@ -50,6 +66,9 @@ if __name__=='__main__':
     pq.add('c', 3)
     pq.add('d', 4)
     pq.add('e', 5)
+    for item in pq.copy():
+        print(item, end=' ')
+    print()
     pq.remove('b')
     pq.remove('d')
     print(pq.pop())
