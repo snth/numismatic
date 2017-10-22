@@ -27,9 +27,9 @@ class OrderBookCollector(Collector):
 
         self.source_stream = (self.source_stream
                               .map(self.order_book.update)
-                              .map(lambda ob: (ob.mid_price(),
-                                               ob.best_bid(),
-                                               ob.best_ask()))
+                              .map(lambda ob: (ob.mid_price,
+                                               ob.best_bid,
+                                               ob.best_ask))
                               )
         if self.format=='text':
             self.source_stream = self.source_stream.map(

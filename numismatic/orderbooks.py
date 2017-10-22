@@ -33,16 +33,19 @@ class OrderBook:
             raise NotImplementedError(type(order))
         return self
 
+    @property
     def best_bid(self):
         return self.orders[self.bids.peek()].price if self.bids else \
             float('nan')
 
+    @property
     def best_ask(self):
         return self.orders[self.asks.peek()].price if self.asks else \
             float('nan')
 
+    @property
     def mid_price(self):
-        return (self.best_bid()+self.best_ask())/2
+        return (self.best_bid+self.best_ask)/2
 
 
 if __name__=='__main__':
