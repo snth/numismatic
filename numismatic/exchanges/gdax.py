@@ -119,10 +119,17 @@ class GDAXExchange(Exchange):
                 self.output_stream.emit(event)
         elif 'type' in msg and msg['type']=='l2update':
             for side, price, size in msg['changes']:
-                volume = float(size) if side=='buy' else -float(size)
-                event = LimitOrder(exchange=self.exchange, symbol=symbol,
-                                   timestamp=timestamp, price=float(price),
-                                   volume=volume, id=price)
+                if size=='0':
+                    volume = float(size) if side=='buy' else -float(size)
+                    event = LimitOrder(exchange=self.exchange, symbol=symbol,
+                                       timestamp=timestamp, price=float(price),
+                                       volume=volume, id=price)
+                else:
+                    # this is actually removing a level
+                    # make up a fake volume to indicate bid or ask
+                    volume = 1.0 if side=='buy' else -1.0
+                    event = CancelOrder(exchange=self.exchange, symbol=symbol,
+                                        timestamp=timestamp, id=price)
                 self.output_stream.emit(event)
         elif isinstance(msg, dict):
             event = msg
