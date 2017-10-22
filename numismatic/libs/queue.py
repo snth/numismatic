@@ -21,26 +21,21 @@ class PriorityQueue:
         heappush(self._heap, entry)
 
     def remove(self, item):
-        'Mark an existing item as REMOVED.  Raise KeyError if not found.'
+        'Mark an existing item as REMOVED.  Raise LookupError if not found.'
         entry = self._entry_finder.pop(item)
         entry[-1] = self._REMOVED
 
     def pop(self):
-        'Remove and return the lowest priority item. Raise KeyError if empty.'
-        if not self.empty():
+        'Remove and return the lowest priority item. Raise LookupError if empty.'
+        if self:
             priority, count, item = heappop(self._heap)
             return item
         else:
-            raise KeyError('pop from an empty priority queue')
+            raise LookupError('pop from an empty priority queue')
 
     def peek(self):
-        return self._heap[0][2] if not self.empty() else \
-            KeyError('priority queue is empty')
-
-    def empty(self):
-        while self._heap and self._heap[0][2] is self._REMOVED:
-            heappop(self._heap)
-        return not self._heap
+        return self._heap[0][2] if self else \
+            LookupError('priority queue is empty')
 
     def copy(self):
         pq = self.__class__()
@@ -48,13 +43,18 @@ class PriorityQueue:
         pq._entry_finder = self._entry_finder.copy()
         return pq
 
+    def __bool__(self):
+        while self._heap and self._heap[0][2] is self._REMOVED:
+            heappop(self._heap)
+        return bool(self._heap)
+
     def __iter__(self):
         return self
 
     def __next__(self):
         try:
             return self.pop()
-        except KeyError:
+        except LookupError:
             raise StopIteration
 
 

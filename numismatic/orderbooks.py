@@ -1,52 +1,39 @@
-from functools import partial
-from itertools import chain
-from collections import defaultdict
-import bisect
-
 import attr
 
 from .libs.events import LimitOrder, CancelOrder
+from .libs.queue import PriorityQueue
 
 
 @attr.s
 class OrderBook:
 
     orders = attr.ib(default=attr.Factory(dict))
-    levels = attr.ib(default=attr.Factory(partial(defaultdict, list)))
-    bids = attr.ib(default=attr.Factory(list))
-    asks = attr.ib(default=attr.Factory(list))
+    bids = attr.ib(default=attr.Factory(PriorityQueue))
+    asks = attr.ib(default=attr.Factory(PriorityQueue))
 
     def update(self, order):
         if isinstance(order, LimitOrder):
             self.orders[order.id] = order
-            level = self.levels[order.price]
-            if not level:
-                # a new level so need to update bids or asks
-                side = self.bids if order.volume>0 else self.asks
-                price = -order.price if order.volume>0 else order.price
-                position = bisect.bisect(side, price)
-                side.insert(position, price)
-            level.append(order.id)
+            side = self.bids if order.volume>0 else self.asks
+            price = -order.price if order.volume>0 else order.price
+            side.add(order.id, price)
         elif isinstance(order, CancelOrder):
             order = self.orders[order.id]
             del self.orders[order.id]
-            level = self.levels[order.price]
-            level.remove(order.id)
-            if not level:
-                del self.levels[order.price]
-                side = self.bids if order.volume>0 else self.asks
-                price = -order.price if order.volume>0 else order.price
-                position = bisect.bisect(side, price)
-                side.pop(position-1)
+            side = self.bids if order.volume>0 else self.asks
+            price = -order.price if order.volume>0 else order.price
+            side.remove(order.id)
         else:
             raise NotImplementedError(type(order))
         return self
 
     def best_bid(self):
-        return -self.bids[0] if self.bids else float('nan')
+        return self.orders[self.bids.peek()].price if self.bids else \
+            float('nan')
 
     def best_ask(self):
-        return self.asks[0] if self.asks else float('nan')
+        return self.orders[self.asks.peek()].price if self.asks else \
+            float('nan')
 
     def mid_price(self):
         return (self.best_bid()+self.best_ask())/2
