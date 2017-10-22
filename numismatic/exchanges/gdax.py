@@ -108,24 +108,21 @@ class GDAXExchange(Exchange):
             self.output_stream.emit(event)
         elif 'type' in msg and msg['type']=='snapshot':
             for price, volume in msg['bids']:
-                event = MarketDepthUpdate(exchange=self.exchange,
-                                          symbol=symbol, timestamp=timestamp,
-                                          price=float(price),
-                                          volume=float(volume))
+                event = LimitOrder(exchange=self.exchange, symbol=symbol,
+                                   timestamp=timestamp, price=float(price),
+                                   volume=float(volume), id=price)
                 self.output_stream.emit(event)
             for price, volume in msg['asks']:
-                event = MarketDepthUpdate(exchange=self.exchange,
-                                          symbol=symbol, timestamp=timestamp,
-                                          price=float(price), 
-                                          volume=-float(volume))
+                event = LimitOrder(exchange=self.exchange, symbol=symbol,
+                                   timestamp=timestamp, price=float(price),
+                                   volume=-float(volume), id=price)
                 self.output_stream.emit(event)
         elif 'type' in msg and msg['type']=='l2update':
             for side, price, size in msg['changes']:
                 volume = float(size) if side=='buy' else -float(size)
-                event = MarketDepthUpdate(exchange=self.exchange,
-                                          symbol=symbol, timestamp=timestamp,
-                                          price=float(price), 
-                                          volume=volume)
+                event = LimitOrder(exchange=self.exchange, symbol=symbol,
+                                   timestamp=timestamp, price=float(price),
+                                   volume=volume, id=price)
                 self.output_stream.emit(event)
         elif isinstance(msg, dict):
             event = msg

@@ -12,16 +12,22 @@ class OrderBook:
     asks = attr.ib(default=attr.Factory(PriorityQueue))
 
     def update(self, order):
-        if isinstance(order, LimitOrder):
-            self.orders[order.id] = order
+        if isinstance(order, LimitOrder) and abs(order.volume>0):
             side = self.bids if order.volume>0 else self.asks
             price = -order.price if order.volume>0 else order.price
             side.add(order.id, price)
+            self.orders[order.id] = order
         elif isinstance(order, CancelOrder):
             order = self.orders[order.id]
-            del self.orders[order.id]
             side = self.bids if order.volume>0 else self.asks
-            price = -order.price if order.volume>0 else order.price
+            side.remove(order.id)
+            del self.orders[order.id]
+        elif isinstance(order, LimitOrder) and order.volume==0:
+            # When dealing with aggregated Level 2 data, a zero volume order
+            # indicates that that level can be removed.
+            order = self.orders[order.id]
+            del self.orders[order.id]
+            side = self.bids if order.price<=self.best_bid else self.asks
             side.remove(order.id)
         else:
             raise NotImplementedError(type(order))
