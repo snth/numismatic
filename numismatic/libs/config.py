@@ -17,5 +17,10 @@ def get_config(entity_filter=None):
     config = get_all_config()
     if (entity_filter is None):
         return config
+    
+    # At this stage, we expect entity_filter to be present
+    # if this is not present, user must be warned
+    if not entity_filter in config:
+        raise KeyError(f'{entity_filter} section is not present in ~/.coinrc')
 
-    return (config[entity_filter] if entity_filter in config else {})
+    return config[entity_filter]
