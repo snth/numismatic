@@ -8,8 +8,6 @@ class Collector:
     types = attr.ib(default=attr.Factory(list))
     filters = attr.ib(default=attr.Factory(list))
 
-    # FIXME: Add a factory method
-
     def __attrs_post_init__(self):
         if self.types:
             self.source_stream = self.source_stream.filter(

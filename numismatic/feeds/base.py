@@ -9,19 +9,6 @@ logger = logging.getLogger(__name__)
 class Feed(abc.ABC):
     "Feed Base class"
 
-    @classmethod
-    def factory(cls, feed_name, *args, **kwargs):
-        if not isinstance(feed_name, str):
-            raise TypeError(f'"feed_name" must be a str. '
-                            'Not {type(feed_name)}.')
-        feed_name = feed_name.lower()
-        subclasses = {subcls.__name__.lower():subcls for subcls in 
-                      cls.__subclasses__()}
-
-        subclass = subclasses[feed_name]
-        feed = subclass(*args, **kwargs)
-        return feed
-
     def __init__(self, requester='base', cache_dir=None):
         # TODO: Use attrs here
         if not isinstance(requester, Requester):

@@ -3,7 +3,7 @@ from itertools import product
 from .base import Feed
 
 
-class Luno(Feed):
+class LunoFeed(Feed):
 
     api_url = 'https://api.mybitx.com/api/1/'
 

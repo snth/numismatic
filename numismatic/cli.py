@@ -8,10 +8,9 @@ from tornado.platform.asyncio import AsyncIOMainLoop
 from streamz import Stream
 import attr
 
-# I don't like these * imports but they're required for the factory() methods
-# to work.
-from .feeds import *
-from .exchanges import *
+from .collectors import Collector
+from .feeds import Feed
+from .exchanges import Exchange
 from .libs.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,7 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
 
 @click.group(chain=True)
 @click.option('--feed', '-f', default='cryptocompare',
-              type=click.Choice(['cryptocompare', 'luno', 'bravenewcoin']))
+              type=click.Choice(Feed._get_subclasses().keys()))
 @click.option('--cache-dir', '-d', default=None)
 @click.option('--requester', '-r', default='base',
               type=click.Choice(['base', 'caching']))
@@ -69,9 +68,8 @@ def coin(state, feed, cache_dir, requester, log_level):
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
-    state['datafeed'] = \
-        Feed.factory(feed_name=feed, cache_dir=cache_dir,
-                         requester=requester)
+    state['datafeed'] = Feed.factory(feed, cache_dir=cache_dir,
+                                     requester=requester)
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
 
@@ -152,7 +150,7 @@ def tabulate(data):
 
 @coin.command()
 @click.option('--exchange', '-e', default='bitfinex',
-              type=click.Choice(['bitfinex', 'gdax', 'luno']))
+              type=click.Choice(Exchange._get_subclasses().keys()))
 @click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
@@ -171,7 +169,7 @@ def tabulate(data):
 def listen(state, exchange, assets, currencies, raw_output, raw_interval, 
            channel, api_key_id, api_key_secret):
     'Listen to live events from an exchange'
-    exchange_name = exchange.lower()
+    exchange_name = exchange
     assets = ','.join(assets).upper().split(',')
     currencies = ','.join(currencies).upper().split(',')
     pairs = list(map('/'.join, product(assets, currencies)))
@@ -183,7 +181,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
         # FIXME: Move the pairs handling into the Exchange code
         for pair in pairs:
             pair = pair.replace('/', '')
-            exchange = Exchange.factory(exchange_name=exchange_name,
+            exchange = Exchange.factory(exchange_name,
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
                                         raw_interval=raw_interval)
@@ -195,7 +193,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
             channel = 'ticker'
         for pair in pairs:
             pair = pair.replace('/', '-')
-            exchange = Exchange.factory(exchange_name=exchange_name,
+            exchange = Exchange.factory(exchange_name,
                                         output_stream=output_stream,
                                         raw_stream=raw_output,
                                         raw_interval=raw_interval)
@@ -207,7 +205,7 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
                           config else '')
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
-        exchange = Exchange.factory(exchange_name=exchange_name,
+        exchange = Exchange.factory(exchange_name,
                                     output_stream=output_stream,
                                     raw_stream=raw_output,
                                     raw_interval=raw_interval,
@@ -222,6 +220,8 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 
 
 @coin.command()
+@click.option('--collector', '-c', default='file', 
+              type=click.Choice(Collector._get_subclasses().keys()))
 @click.option('--output', '-o', default='-', type=click.Path())
 @click.option('--filter', '-f', default='', type=str, multiple=True)
 @click.option('--type', '-t', default=None, multiple=True,
@@ -231,13 +231,13 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 @click.option('--json', 'format', flag_value='json')
 @click.option('--interval', '-i', default=None, type=float)
 @pass_state
-def collect(state, filter, type, output, format, interval):
+def collect(state, collector, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
     output_stream = state['output_stream']
-    from .collectors import FileCollector
-    collector = FileCollector(source_stream=output_stream, path=output, 
-                              format=format, types=type, filters=filter,
-                              interval=interval)
+    collector_name = collector
+    collector = Collector.factory(collector_name, source_stream=output_stream,
+                                  path=output, format=format, types=type,
+                                  filters=filter, interval=interval)
     # state['collectors'].append(collector)
 
 
