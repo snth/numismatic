@@ -37,6 +37,10 @@ class LunoExchange(Exchange):
             except asyncio.CancelledError:
                 ## unsubscribe
                 confirmation = await self._unsubscribe(ws, symbol)
+            except Exception as ex:
+                logger.error(ex)
+                logger.error(packet)
+                raise
 
     async def _subscribe(self, symbol):
         wss_url = f'{self.wss_url}/{symbol}'
@@ -82,6 +86,9 @@ class LunoExchange(Exchange):
     def _handle_packet(self, packet, symbol):
         super()._handle_packet(packet, symbol)
         msg = json.loads(packet)
+        if not msg:
+            # sometimes we receive empty packets
+            return msg
         # TODO: Implement handling of sequence numbers for detecting missing
         #       events
         timestamp = float(msg['timestamp'])/1000

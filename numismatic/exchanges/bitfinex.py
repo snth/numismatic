@@ -35,15 +35,6 @@ class BitfinexExchange(Exchange):
         logger.info(connection_status)
         return ws
 
-    @staticmethod
-    async def _ping_pong(ws):
-        'Simple ping pong for testing the connection'
-        # try ping-pong
-        msg = json.dumps({'event':'ping'})
-        await ws.send(msg)
-        pong = await ws.recv()
-        return pong
-
     async def listen(self, symbol, channel='trades'):
         ws = await self._connect()
         await super().listen(symbol)
@@ -120,6 +111,15 @@ class BitfinexExchange(Exchange):
         else:
             raise NotImplementedError(msg)
         return msg
+
+    @staticmethod
+    async def _ping_pong(ws):
+        'Simple ping pong for testing the connection'
+        # try ping-pong
+        msg = json.dumps({'event':'ping'})
+        await ws.send(msg)
+        pong = await ws.recv()
+        return pong
 
 
 if __name__=='__main__':

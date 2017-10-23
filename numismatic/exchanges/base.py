@@ -16,6 +16,7 @@ LIBRARY_NAME = 'numismatic'
 @attr.s
 class Exchange(abc.ABC):
     '''Base class for Exchanges'''
+    # TODO: Write to a separate stream
     output_stream = attr.ib()
     raw_stream = attr.ib(default=None)
     raw_interval = attr.ib(default=1)
@@ -36,6 +37,7 @@ class Exchange(abc.ABC):
     @abc.abstractmethod
     async def listen(self, symbol):
         if self.raw_stream is not None:
+            # FIXME: Use a FileCollector here
             if self.raw_stream=='':
                 from appdirs import user_cache_dir
                 self.raw_stream = user_cache_dir(LIBRARY_NAME)

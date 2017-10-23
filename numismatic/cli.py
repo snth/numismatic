@@ -64,6 +64,8 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin listen collect run
 
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
+
+        coin listen -e bitfinex -e gdax collect run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
@@ -175,7 +177,10 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
     pairs = list(map('/'.join, product(assets, currencies)))
     output_stream = state['output_stream']
     subscriptions = state['subscriptions']
+    # FIXME: each pair should get a separate stream which we should keep track
+    #        of in state['streams'].
     if exchange_name=='bitfinex':
+        # FIXME: Move the pairs handling into the Exchange code
         for pair in pairs:
             pair = pair.replace('/', '')
             exchange = Exchange.factory(exchange_name=exchange_name,
@@ -217,31 +222,23 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
 
 
 @coin.command()
+@click.option('--output', '-o', default='-', type=click.Path())
 @click.option('--filter', '-f', default='', type=str, multiple=True)
 @click.option('--type', '-t', default=None, multiple=True,
               type=click.Choice(['None', 'Trade', 'Heartbeat', 'LimitOrder',
                                  'CancelOrder']))
-@click.option('--output', '-o', default='-', type=click.File('w'))
-@click.option('--events', 'format', flag_value='events', default=True)
+@click.option('--text', 'format', flag_value='text', default=True)
 @click.option('--json', 'format', flag_value='json')
+@click.option('--interval', '-i', default=None, type=float)
 @pass_state
-def collect(state, filter, type, output, format):
+def collect(state, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
-    # TODO: The filter logic here should be moved to the collectors module
     output_stream = state['output_stream']
-    if type:
-        output_stream = output_stream.filter(
-            lambda ev: ev.__class__.__name__ in set(type))
-    filters = filter
-    for filter in filters:
-        output_stream = output_stream.filter(
-            lambda x: eval(filter, attr.asdict(x)))
-    if format=='json':
-        output_stream = output_stream.map(lambda ev: ev.json())
-    sink = (output_stream
-            .map(lambda ev: output.write(str(ev)+'\n'))
-            .map(lambda ev: output.flush())
-            )
+    from .collectors import FileCollector
+    collector = FileCollector(source_stream=output_stream, path=output, 
+                              format=format, types=type, filters=filter,
+                              interval=interval)
+    # state['collectors'].append(collector)
 
 
 @coin.command()
