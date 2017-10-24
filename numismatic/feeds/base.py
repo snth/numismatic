@@ -6,8 +6,7 @@ from ..libs.requesters import Requester
 logger = logging.getLogger(__name__)
 
 
-class Feed(abc.ABC):
-    "Feed Base class"
+class RestApi(abc.ABC):
 
     def __init__(self, requester='base', cache_dir=None):
         # TODO: Use attrs here
@@ -20,6 +19,10 @@ class Feed(abc.ABC):
         response = self.requester.get(api_url, params=params, headers=headers)
         data = response.json()
         return data
+
+
+class Feed(abc.ABC):
+    "Feed Base class"
 
     @abc.abstractmethod
     def get_list(self):
