@@ -7,15 +7,33 @@ from streamz import Stream
 import attr
 import websockets
 
-from .base import Exchange
+from .base import Feed, WebsocketApi
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
 
 
+class BitfinexFeed(Feed):
+
+    def __init__(self, **kwargs):
+        self.rest_api = None
+        self.ws_api = BitfinexWebsocketApi(**{a.name:kwargs[a.name] for a in 
+                                              attr.fields(BitfinexWebsocketApi)
+                                              if a.name in kwargs})
+
+    def get_list(self):
+        raise NotImplemented()
+
+    def get_info(self, assets):
+        raise NotImplemented()
+ 
+    def get_prices(self, assets, currencies):
+        raise NotImplemented()       
+
+
 @attr.s
-class BitfinexExchange(Exchange):
-    '''Websocket client for the Bitfinex Exchange
+class BitfinexWebsocketApi(WebsocketApi):
+    '''Websocket client for the Bitfinex WebsocketApi
 
     This currently opens a separate socket for every symbol that we listen to.
     This could probably be handled by having just one socket.
@@ -123,13 +141,13 @@ class BitfinexExchange(Exchange):
 
 if __name__=='__main__':
     # Simple example of how these should be used
-    # Test with: python -m numismatic.exchanges.bitfinex
+    # Test with: python -m numismatic.feeds.bitfinex
     logging.basicConfig(level=logging.INFO)
     from streamz import Stream
     output_stream = Stream()
     printer = output_stream.map(print)
 
-    bfx = BitfinexExchange(output_stream=output_stream)
+    bfx = BitfinexWebsocketApi(output_stream=output_stream)
     bfx_btc = bfx.listen('BTCUSD', 'trades')
 
     loop = asyncio.get_event_loop()

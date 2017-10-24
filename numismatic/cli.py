@@ -10,7 +10,6 @@ import attr
 
 from .collectors import Collector
 from .feeds import Feed
-from .exchanges import Exchange
 from .libs.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -64,7 +63,7 @@ def coin(state, feed, cache_dir, requester, log_level):
 
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
 
-        coin listen -e bitfinex -e gdax collect run
+        coin listen -f bitfinex -f gdax collect run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
@@ -149,8 +148,8 @@ def tabulate(data):
 
 
 @coin.command()
-@click.option('--exchange', '-e', default='bitfinex',
-              type=click.Choice(Exchange._get_subclasses().keys()))
+@click.option('--feed', '-f', default='bitfinex',
+              type=click.Choice(Feed._get_subclasses().keys()))
 @click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
@@ -160,16 +159,16 @@ def tabulate(data):
 @click.option('--raw-interval', '-i', default=1, 
               type=float, help="The interval between writing the raw stream "
               "to disk")
-# FIXME: The --channel and --api-key-* options are exchange specific and 
+# FIXME: The --channel and --api-key-* options are Feed specific and 
 #        should probably be handled differently.
 @click.option('--channel', '-C', default='trades', type=str)
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
-def listen(state, exchange, assets, currencies, raw_output, raw_interval, 
+def listen(state, feed, assets, currencies, raw_output, raw_interval, 
            channel, api_key_id, api_key_secret):
-    'Listen to live events from an exchange'
-    exchange_name = exchange
+    'Listen to live events from a feed'
+    feed_name = feed
     assets = ','.join(assets).upper().split(',')
     currencies = ','.join(currencies).upper().split(',')
     pairs = list(map('/'.join, product(assets, currencies)))
@@ -177,44 +176,44 @@ def listen(state, exchange, assets, currencies, raw_output, raw_interval,
     subscriptions = state['subscriptions']
     # FIXME: each pair should get a separate stream which we should keep track
     #        of in state['streams'].
-    if exchange_name=='bitfinex':
-        # FIXME: Move the pairs handling into the Exchange code
+    if feed_name=='bitfinex':
+        # FIXME: Move the pairs handling into the Feed code
         for pair in pairs:
             pair = pair.replace('/', '')
-            exchange = Exchange.factory(exchange_name,
-                                        output_stream=output_stream,
-                                        raw_stream=raw_output,
-                                        raw_interval=raw_interval)
-            subscription = exchange.listen(pair, channel)
-            subscriptions[f'{pair}-{exchange_name}'] = subscription
-    elif exchange_name=='gdax':
+            feed = Feed.factory(feed_name, 
+                                output_stream=output_stream,
+                                raw_stream=raw_output,
+                                raw_interval=raw_interval)
+            subscription = feed.listen(pair, channel)
+            subscriptions[f'{pair}-{feed_name}'] = subscription
+    elif feed_name=='gdax':
         if channel=='trades':
             # FIXME: handle this mapping in a better way
             channel = 'ticker'
         for pair in pairs:
             pair = pair.replace('/', '-')
-            exchange = Exchange.factory(exchange_name,
-                                        output_stream=output_stream,
-                                        raw_stream=raw_output,
-                                        raw_interval=raw_interval)
-            subscription = exchange.listen(pair, channel)
-            subscriptions[f'{pair}-{exchange_name}'] = subscription
-    elif exchange_name=='luno':
+            feed = Feed.factory(feed_name,
+                                output_stream=output_stream,
+                                raw_stream=raw_output,
+                                raw_interval=raw_interval)
+            subscription = feed.listen(pair, channel)
+            subscriptions[f'{pair}-{feed_name}'] = subscription
+    elif feed_name=='luno':
         if api_key_id is None:
             api_key_id = (config['Luno'].get('api_key_id', '') if 'Luno' in
                           config else '')
             api_key_secret = (config['Luno'].get('api_key_secret', '') if
                               'Luno' in config else '')
-        exchange = Exchange.factory(exchange_name,
-                                    output_stream=output_stream,
-                                    raw_stream=raw_output,
-                                    raw_interval=raw_interval,
-                                    api_key_id=api_key_id,
-                                    api_key_secret=api_key_secret)
+        feed = Feed.factory(feed_name,
+                            output_stream=output_stream,
+                            raw_stream=raw_output,
+                            raw_interval=raw_interval,
+                            api_key_id=api_key_id,
+                            api_key_secret=api_key_secret)
         for pair in pairs:
             pair = pair.replace('/', '')
-            subscription = exchange.listen(pair)
-            subscriptions[f'{pair}-{exchange_name}'] = subscription
+            subscription = feed.listen(pair)
+            subscriptions[f'{pair}-{feed_name}'] = subscription
     else:
         raise NotImplementedError()
 
