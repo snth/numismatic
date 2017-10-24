@@ -27,6 +27,7 @@ class Trade(Event):
     volume = attr.ib()
     id = attr.ib(default=None)
 
+
 @attr.s(slots=True)
 class LimitOrder(Event):
     exchange = attr.ib()
@@ -36,9 +37,19 @@ class LimitOrder(Event):
     volume = attr.ib()
     id = attr.ib()
 
+
 @attr.s(slots=True)
 class CancelOrder(Event):
     exchange = attr.ib()
     symbol = attr.ib()
     timestamp = attr.ib()
     id = attr.ib()
+
+
+@attr.s(slots=True)
+class MarketDepthUpdate(Event):
+    exchange = attr.ib()
+    symbol = attr.ib()
+    timestamp = attr.ib()
+    price = attr.ib()
+    volume = attr.ib()

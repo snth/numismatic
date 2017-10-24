@@ -4,15 +4,17 @@ from functools import partial
 
 import attr
 
+from ..orderbooks import OrderBook
 from .base import Collector
 
 
 @attr.s
-class FileCollector(Collector):
+class OrderBookCollector(Collector):
 
     path = attr.ib(default='-')
     format = attr.ib(default='text')
     interval = attr.ib(default=None)
+    order_book = attr.ib(default=attr.Factory(OrderBook))
 
     def __attrs_post_init__(self):
         super().__attrs_post_init__()
@@ -23,6 +25,12 @@ class FileCollector(Collector):
         else:
             self._opener = partial(open, self.path, mode='at')
 
+        self.source_stream = (self.source_stream
+                              .map(self.order_book.update)
+                              .map(lambda ob: (ob.mid_price,
+                                               ob.best_bid,
+                                               ob.best_ask))
+                              )
         if self.format=='text':
             self.source_stream = self.source_stream.map(
                 lambda ev: str(ev)+'\n')
