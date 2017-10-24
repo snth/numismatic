@@ -24,6 +24,14 @@ class RestApi(abc.ABC):
 class Feed(abc.ABC):
     "Feed Base class"
 
+    def __getattr__(self, attr):
+        if self.rest_api is not None and hasattr(self.rest_api, attr):
+            return getattr(self.rest_api, attr)
+        elif self.ws_api is not None and hasattr(self.ws_api, attr):
+            return getattr(self.ws_api, attr)
+        else:
+            raise AttributeError
+
     @abc.abstractmethod
     def get_list(self):
         return

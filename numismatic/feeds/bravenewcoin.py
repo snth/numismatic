@@ -42,7 +42,7 @@ class BraveNewCoinFeed(Feed):
         self.rest_api = BraveNewCoinRestApi(
             requester=requester, cache_dir=cache_dir, api_key_id=api_key_id,
             api_key_secret=api_key_secret)
-        self.websocket_api = None
+        self.ws_api = None
 
     def get_list(self): 
         digital_currencies = self.rest_api.get_digital_currency_symbols()
@@ -65,3 +65,10 @@ class BraveNewCoinFeed(Feed):
                 response.append({'asset':asset, 'currency':currency, 
                                  'price': float(data['last_price'])})
         return response
+
+
+if __name__ == '__main__':
+    bnc = BraveNewCoinFeed()
+    print(bnc.get_list())
+    print(bnc.get_prices('BTC', 'USD'))
+    print(bnc.get_ticker('BTC', 'USD'))

@@ -20,7 +20,7 @@ class LunoFeed(Feed):
 
     def __init__(self, requester='basic', cache_dir=None):
         self.rest_api = LunoRestApi(requester=requester, cache_dir=cache_dir)
-        self.websocket_api = None
+        self.ws_api = None
 
     def get_list(self):
         tickers = self.rest_api.get_tickers()
