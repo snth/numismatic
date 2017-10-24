@@ -6,16 +6,6 @@ from .base import Feed, RestApi
 
 logger = logging.getLogger(__name__)
 
-
-class LunoRestApi(RestApi):
-
-    api_url = 'https://api.mybitx.com/api/1/'
-
-    def get_tickers(self):
-        api_url = f'{self.api_url}/tickers'
-        data = self._make_request(api_url)
-        return data['tickers']
-
 class LunoFeed(Feed):
 
     def __init__(self, requester='basic', cache_dir=None):
@@ -36,3 +26,13 @@ class LunoFeed(Feed):
         pairs = {f'{asset}{currency}' for asset, currency in 
                  product(assets, currencies)}
         return [ticker for ticker in tickers if ticker['pair'] in pairs]
+
+
+class LunoRestApi(RestApi):
+
+    api_url = 'https://api.mybitx.com/api/1/'
+
+    def get_tickers(self):
+        api_url = f'{self.api_url}/tickers'
+        data = self._make_request(api_url)
+        return data['tickers']
