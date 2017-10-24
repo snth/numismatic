@@ -2,7 +2,6 @@ import logging
 import asyncio
 import json
 import time
-import gzip
 
 from streamz import Stream
 import attr

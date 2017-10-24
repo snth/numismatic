@@ -3,7 +3,6 @@ import asyncio
 import json
 import time
 from datetime import datetime
-import gzip
 
 from streamz import Stream
 import attr
