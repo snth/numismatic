@@ -11,14 +11,12 @@ class BraveNewCoinFeed(Feed):
                  api_key_secret=None):
         # Should the requester and cache_dir not also be settable in config?
         super().__init__(requester=requester, cache_dir=cache_dir)
-        all__config = get_config()
-        config = (all_config['bravenewcoin'] if 'bravenewcoin' in all_config
-                else {})
-        self.api_key_id = (config.get('api_key_id', '') if api_key_id is None
-                            else api_key_id)
-        self.api_key_secret = (config.get('api_key_secret', '') if
-                                api_key_secret is None else api_key_secret)
-        self.headers = {f'{self.api_key_id}': f'{self.api_key_secret}'}
+        
+        config = get_config('bravenewcoin')
+        self.api_key_secret = config.get('api_key_secret', None)
+        assert self.api_key_secret
+
+        self.headers = {'X-Mashape-Key': f'{self.api_key_secret}'}
 
     def get_list(self): 
         api_url = f'{self.api_url}/digital-currency-symbols'
@@ -31,9 +29,8 @@ class BraveNewCoinFeed(Feed):
 
         return response
 
-    #TODO implement this
     def get_info(self, assets):
-        raise NotImplementedError('Not implemented yet') 
+        raise NotImplementedError('Not available for this feed.') 
 
     def get_prices(self, assets, currencies):
         """Not the most efficient method as BNC does not
