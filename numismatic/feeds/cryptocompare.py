@@ -5,7 +5,7 @@ import time
 from datetime import timedelta
 from dateutil.parser import parse
 
-from .base import Feed, RestApi
+from .base import Feed, RestClient
 from ..libs.utils import date_range, make_list_str, to_datetime, \
     dates_and_frequencies
 
@@ -18,17 +18,17 @@ class CryptoCompareFeed(Feed):
     _interval_limit = 2000
 
     def __init__(self, requester='basic', cache_dir=None):
-        self.rest_api = CryptoCompareRestApi(requester=requester,
+        self.rest_client = CryptoCompareRestClient(requester=requester,
                                              cache_dir=cache_dir)
-        self.ws_api = None
+        self.websocket_client = None
 
     def get_list(self):
-        return self.rest_api.get_coinlist()
+        return self.rest_client.get_coinlist()
         return coinlist.keys()
 
     def get_info(self, assets):
         assets = assets.upper().split(',')
-        coinlist = self.rest_api.get_coinlist()
+        coinlist = self.rest_client.get_coinlist()
         assets_info = [coinlist[a] for a in assets]
         return assets_info
 
@@ -36,7 +36,7 @@ class CryptoCompareFeed(Feed):
         assets = assets.upper().split(',')
         currencies = currencies.upper().split(',')
         # FIXME: SHouldn't use caching
-        data = self.rest_api.get_latest_price_multi(assets, currencies)
+        data = self.rest_client.get_latest_price_multi(assets, currencies)
         prices = [{'asset':asset, 'currency':currency, 'price':price}
                   for asset, asset_prices in data.items()
                   for currency, price in asset_prices.items()]
@@ -58,15 +58,15 @@ class CryptoCompareFeed(Feed):
             logger.debug(f'Getting {asset}/{currency} for {limit}{freqstr} to {end}')
             time.sleep(1/4)   # max 4 requests per second
             if freq.startswith('m'):
-                chunk = self.rest_api.get_historical_minute(
+                chunk = self.rest_client.get_historical_minute(
                     fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             elif freq.startswith('h'):
-                chunk = self.rest_api.get_historical_hour(
+                chunk = self.rest_client.get_historical_hour(
                     fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             elif freq.startswith('d'):
-                chunk = self.rest_api.get_historical_day(
+                chunk = self.rest_client.get_historical_day(
                     fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             else:
@@ -75,7 +75,7 @@ class CryptoCompareFeed(Feed):
         return data
 
 
-class CryptoCompareRestApi(RestApi):
+class CryptoCompareRestClient(RestClient):
     '''Low level API for CryptoCompare.com
 
     TODO:

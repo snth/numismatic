@@ -19,8 +19,8 @@ LIBRARY_NAME = 'numismatic'
 class Feed(abc.ABC):
     "Feed Base class"
 
-    rest_api = attr.ib(default=None)
-    ws_api = attr.ib(default=None)
+    rest_client = attr.ib(default=None)
+    websocket_client = attr.ib(default=None)
         
     @abc.abstractmethod
     def get_list(self):
@@ -35,16 +35,16 @@ class Feed(abc.ABC):
         return
 
     def __getattr__(self, attr):
-        if self.rest_api is not None and hasattr(self.rest_api, attr):
-            return getattr(self.rest_api, attr)
-        elif self.ws_api is not None and hasattr(self.ws_api, attr):
-            return getattr(self.ws_api, attr)
+        if self.rest_client is not None and hasattr(self.rest_client, attr):
+            return getattr(self.rest_client, attr)
+        elif self.websocket_client is not None and hasattr(self.websocket_client, attr):
+            return getattr(self.websocket_client, attr)
         else:
             raise AttributeError
 
 
 @attr.s
-class RestApi(abc.ABC):
+class RestClient(abc.ABC):
 
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
@@ -64,8 +64,8 @@ class RestApi(abc.ABC):
 
 
 @attr.s
-class WebsocketApi(abc.ABC):
-    '''Base class for WebsocketApi feeds'''
+class WebsocketClient(abc.ABC):
+    '''Base class for WebsocketClient feeds'''
     # TODO: Write to a separate stream
     output_stream = attr.ib(default=None)
     raw_stream = attr.ib(default=None)

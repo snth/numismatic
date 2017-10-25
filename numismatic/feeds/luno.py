@@ -8,7 +8,7 @@ import attr
 import websockets
 
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
-from .base import Feed, RestApi, WebsocketApi
+from .base import Feed, RestClient, WebsocketClient
 
 
 logger = logging.getLogger(__name__)
@@ -17,15 +17,15 @@ logger = logging.getLogger(__name__)
 class LunoFeed(Feed):
 
     def __init__(self, **kwargs):
-        self.rest_api = LunoRestApi(**{a.name:kwargs[a.name] 
-                                       for a in attr.fields(LunoRestApi) 
+        self.rest_client = LunoRestClient(**{a.name:kwargs[a.name] 
+                                       for a in attr.fields(LunoRestClient) 
                                        if a.name in kwargs})
-        self.ws_api = LunoWebsocketApi(**{a.name:kwargs[a.name] for a 
-                                          in attr.fields(LunoWebsocketApi)
+        self.websocket_client = LunoWebsocketClient(**{a.name:kwargs[a.name] for a 
+                                          in attr.fields(LunoWebsocketClient)
                                           if a.name in kwargs})
 
     def get_list(self):
-        tickers = self.rest_api.get_tickers()
+        tickers = self.rest_client.get_tickers()
         return [ticker['pair'] for ticker in tickers]
 
     def get_info(self, assets):
@@ -34,13 +34,13 @@ class LunoFeed(Feed):
     def get_prices(self, assets, currencies):
         assets = assets.upper().split(',')
         currencies = currencies.upper().split(',')
-        tickers = self.rest_api.get_tickers()
+        tickers = self.rest_client.get_tickers()
         pairs = {f'{asset}{currency}' for asset, currency in 
                  product(assets, currencies)}
         return [ticker for ticker in tickers if ticker['pair'] in pairs]
 
 
-class LunoRestApi(RestApi):
+class LunoRestClient(RestClient):
 
     api_url = 'https://api.mybitx.com/api/1/'
 
@@ -51,7 +51,7 @@ class LunoRestApi(RestApi):
 
 
 @attr.s
-class LunoWebsocketApi(WebsocketApi):
+class LunoWebsocketClient(WebsocketClient):
     '''Websocket client for the Luno Exchange
 
     '''
@@ -173,7 +173,7 @@ if __name__=='__main__':
     output_stream = Stream()
     printer = output_stream.map(print)
 
-    luno = LunoWebsocketApi(output_stream=output_stream, api_key_id=api_key_id,
+    luno = LunoWebsocketClient(output_stream=output_stream, api_key_id=api_key_id,
                             api_key_secret=api_key_secret)
     luno_btc = luno.listen('XBTZAR')
 

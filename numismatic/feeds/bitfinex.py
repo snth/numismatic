@@ -7,7 +7,7 @@ from streamz import Stream
 import attr
 import websockets
 
-from .base import Feed, WebsocketApi
+from .base import Feed, WebsocketClient
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 class BitfinexFeed(Feed):
 
     def __init__(self, **kwargs):
-        self.rest_api = None
-        self.ws_api = BitfinexWebsocketApi(**{a.name:kwargs[a.name] for a in 
-                                              attr.fields(BitfinexWebsocketApi)
+        self.rest_client = None
+        self.websocket_client = BitfinexWebsocketClient(**{a.name:kwargs[a.name] for a in 
+                                              attr.fields(BitfinexWebsocketClient)
                                               if a.name in kwargs})
 
     def get_list(self):
@@ -32,8 +32,8 @@ class BitfinexFeed(Feed):
 
 
 @attr.s
-class BitfinexWebsocketApi(WebsocketApi):
-    '''Websocket client for the Bitfinex WebsocketApi
+class BitfinexWebsocketClient(WebsocketClient):
+    '''Websocket client for the Bitfinex WebsocketClient
 
     This currently opens a separate socket for every symbol that we listen to.
     This could probably be handled by having just one socket.
@@ -147,7 +147,7 @@ if __name__=='__main__':
     output_stream = Stream()
     printer = output_stream.map(print)
 
-    bfx = BitfinexWebsocketApi(output_stream=output_stream)
+    bfx = BitfinexWebsocketClient(output_stream=output_stream)
     bfx_btc = bfx.listen('BTCUSD', 'trades')
 
     loop = asyncio.get_event_loop()

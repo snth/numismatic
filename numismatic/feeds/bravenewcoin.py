@@ -1,6 +1,6 @@
 import logging
 
-from .base import Feed, RestApi
+from .base import Feed, RestClient
 from ..libs.config import get_config
 
 
@@ -11,13 +11,13 @@ class BraveNewCoinFeed(Feed):
 
     def __init__(self, requester='basic', cache_dir=None, api_key_id=None,
                  api_key_secret=None):
-        self.rest_api = BraveNewCoinRestApi(
+        self.rest_client = BraveNewCoinRestClient(
             requester=requester, cache_dir=cache_dir, api_key_id=api_key_id,
             api_key_secret=api_key_secret)
-        self.ws_api = None
+        self.websocket_client = None
 
     def get_list(self): 
-        digital_currencies = self.rest_api.get_digital_currency_symbols()
+        digital_currencies = self.rest_client.get_digital_currency_symbols()
         response = [key 
                     for json_dict in digital_currencies
                     for key, value in json_dict.items()]
@@ -33,13 +33,13 @@ class BraveNewCoinFeed(Feed):
         response = []
         for asset in assets.split(','):
             for currency in currencies.split(','):
-                data = self.rest_api.get_ticker(coin=asset, show=currency)
+                data = self.rest_client.get_ticker(coin=asset, show=currency)
                 response.append({'asset':asset, 'currency':currency, 
                                  'price': float(data['last_price'])})
         return response
 
 
-class BraveNewCoinRestApi(RestApi):
+class BraveNewCoinRestClient(RestClient):
 
     api_url = 'https://bravenewcoin-v1.p.mashape.com/'
 
