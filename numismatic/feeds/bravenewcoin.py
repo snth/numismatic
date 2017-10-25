@@ -14,7 +14,7 @@ class BraveNewCoinFeed(Feed):
         self.rest_api = BraveNewCoinRestApi(
             requester=requester, cache_dir=cache_dir, api_key_id=api_key_id,
             api_key_secret=api_key_secret)
-        self.ws_api = None
+        self.websocket_client = None
 
     def get_list(self): 
         digital_currencies = self.rest_api.get_digital_currency_symbols()

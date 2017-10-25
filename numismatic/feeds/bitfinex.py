@@ -17,7 +17,7 @@ class BitfinexFeed(Feed):
 
     def __init__(self, **kwargs):
         self.rest_api = None
-        self.ws_api = BitfinexWebsocketApi(**{a.name:kwargs[a.name] for a in 
+        self.websocket_client = BitfinexWebsocketApi(**{a.name:kwargs[a.name] for a in 
                                               attr.fields(BitfinexWebsocketApi)
                                               if a.name in kwargs})
 

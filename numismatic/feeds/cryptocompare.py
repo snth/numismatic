@@ -20,7 +20,7 @@ class CryptoCompareFeed(Feed):
     def __init__(self, requester='basic', cache_dir=None):
         self.rest_api = CryptoCompareRestApi(requester=requester,
                                              cache_dir=cache_dir)
-        self.ws_api = None
+        self.websocket_client = None
 
     def get_list(self):
         return self.rest_api.get_coinlist()

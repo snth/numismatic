@@ -18,7 +18,7 @@ class GDAXFeed(Feed):
 
     def __init__(self, **kwargs):
         self.rest_api = None
-        self.ws_api = GDAXWebsocketApi(**{a.name:kwargs[a.name] for a 
+        self.websocket_client = GDAXWebsocketApi(**{a.name:kwargs[a.name] for a 
                                           in attr.fields(GDAXWebsocketApi)
                                           if a.name in kwargs})
 

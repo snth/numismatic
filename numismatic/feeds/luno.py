@@ -20,7 +20,7 @@ class LunoFeed(Feed):
         self.rest_api = LunoRestApi(**{a.name:kwargs[a.name] 
                                        for a in attr.fields(LunoRestApi) 
                                        if a.name in kwargs})
-        self.ws_api = LunoWebsocketApi(**{a.name:kwargs[a.name] for a 
+        self.websocket_client = LunoWebsocketApi(**{a.name:kwargs[a.name] for a 
                                           in attr.fields(LunoWebsocketApi)
                                           if a.name in kwargs})
 
