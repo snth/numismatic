@@ -64,8 +64,8 @@ class RestApi(abc.ABC):
 
 
 @attr.s
-class WebsocketApi(abc.ABC):
-    '''Base class for WebsocketApi feeds'''
+class WebsocketClient(abc.ABC):
+    '''Base class for WebsocketClient feeds'''
     # TODO: Write to a separate stream
     output_stream = attr.ib(default=None)
     raw_stream = attr.ib(default=None)

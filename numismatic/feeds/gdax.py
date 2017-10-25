@@ -8,7 +8,7 @@ from streamz import Stream
 import attr
 import websockets
 
-from .base import Feed, WebsocketApi
+from .base import Feed, WebsocketClient
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
@@ -18,8 +18,8 @@ class GDAXFeed(Feed):
 
     def __init__(self, **kwargs):
         self.rest_api = None
-        self.websocket_client = GDAXWebsocketApi(**{a.name:kwargs[a.name] for a 
-                                          in attr.fields(GDAXWebsocketApi)
+        self.websocket_client = GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
+                                          in attr.fields(GDAXWebsocketClient)
                                           if a.name in kwargs})
 
     def get_list(self):
@@ -33,8 +33,8 @@ class GDAXFeed(Feed):
 
 
 @attr.s
-class GDAXWebsocketApi(WebsocketApi):
-    '''Websocket client for the GDAX WebsocketApi
+class GDAXWebsocketClient(WebsocketClient):
+    '''Websocket client for the GDAX WebsocketClient
 
     This currently opens a separate socket for every symbol that we listen to.
     This could probably be handled by having just one socket.
@@ -136,7 +136,7 @@ if __name__=='__main__':
     output_stream = Stream()
     printer = output_stream.map(print)
 
-    bfx = GDAXWebsocketApi(output_stream=output_stream)
+    bfx = GDAXWebsocketClient(output_stream=output_stream)
     bfx_btc = bfx.listen('BTC-USD', 'ticker,heartbeat')
 
     loop = asyncio.get_event_loop()
