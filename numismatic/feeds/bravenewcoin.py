@@ -49,10 +49,15 @@ class BraveNewCoinRestApi(RestApi):
         super().__init__(requester=requester, cache_dir=cache_dir)
         
         config = get_config('bravenewcoin')
-        self.api_key_secret = config.get('api_key_secret', None)
-        assert self.api_key_secret
+        if api_key_secret is None:
+            api_key_secret = config.get('api_key_secret', None)
+        
+        if api_key_id is None:
+            # X-Mashape-Key is the default id
+            api_key_id = config.get('api_key_id', 'X-Mashape-Key')
 
-        self.headers = {'X-Mashape-Key': f'{self.api_key_secret}'}
+        assert api_key_secret, api_key_id
+        self.headers = {api_key_id: api_key_secret}
 
     def get_digital_currency_symbols(self): 
         api_url = f'{self.api_url}/digital-currency-symbols'
