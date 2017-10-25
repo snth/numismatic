@@ -1,5 +1,4 @@
 import logging
-import asyncio
 import json
 import time
 from datetime import datetime
@@ -43,30 +42,8 @@ class GDAXWebsocketClient(WebsocketClient):
     wss_url = 'wss://ws-feed.gdax.com'
     exchange = 'GDAX'
 
-
-    @classmethod
-    async def _connect(cls):
-        logger.info(f'Connecting to {cls.wss_url!r} ...')
-        ws = await websockets.connect(cls.wss_url)
-        # packet = await ws.recv()
-        # connection_status = json.loads(packet)
-        # logger.info(connection_status)
-        return ws
-
-
-    async def listen(self, symbol, channel='ticker'):
-        ws = await self._connect()
-        await super().listen(symbol)
-        channel_info = await self._subscribe(ws, symbol,  channel)
-        while True:
-            try:
-                packet = await ws.recv()
-                msg = self._handle_packet(packet, symbol)
-            except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = await self._unsubscribe(ws, channel_info)
-
-    async def _subscribe(self, ws, symbol, channel):
+    async def _subscribe(self, symbol, channel, wss_url=None):
+        ws, channel_info = await super()._subscribe(symbol, channel, wss_url)
         msg = dict(type='subscribe', product_ids=symbol.split(','),
                    channels=channel.split(','))
         packet = json.dumps(msg)
@@ -80,7 +57,7 @@ class GDAXWebsocketClient(WebsocketClient):
                 channel_info = msg
                 logger.info(channel_info)
                 break
-        return channel_info 
+        return ws, channel_info
 
     async def _unsubscribe(self, ws, channel_info):
         symbols = {symbol for channel in channel_info['channels'] 
@@ -132,6 +109,7 @@ if __name__=='__main__':
     # Simple example of how these should be used
     # Test with: python -m numismatic.exchanges.bitfinex
     logging.basicConfig(level=logging.INFO)
+    import asyncio
     from streamz import Stream
     output_stream = Stream()
     printer = output_stream.map(print)

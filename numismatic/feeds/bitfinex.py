@@ -1,7 +1,6 @@
 import logging
-import asyncio
-import json
 import time
+import json
 
 from streamz import Stream
 import attr
@@ -42,30 +41,15 @@ class BitfinexWebsocketClient(WebsocketClient):
     wss_url = 'wss://api.bitfinex.com/ws/2'
     exchange = 'Bitfinex'
 
-
     @classmethod
-    async def _connect(cls):
-        logger.info(f'Connecting to {cls.wss_url!r} ...')
-        ws = await websockets.connect(cls.wss_url)
+    async def on_connect(cls, ws):
         packet = await ws.recv()
         connection_status = json.loads(packet)
         logger.info(connection_status)
         return ws
 
-    async def listen(self, symbol, channel='trades'):
-        ws = await self._connect()
-        await super().listen(symbol)
-        channel_info = await self._subscribe(ws, symbol,  channel)
-        while True:
-            try:
-                packet = await ws.recv()
-                msg = self._handle_packet(packet, symbol)
-            except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = \
-                    await asyncio.shield(self._unsubscribe(ws, channel_info))
-
-    async def _subscribe(self, ws, symbol, channel):
+    async def _subscribe(self, symbol, channel='trades', wss_url=None):
+        ws, channel_info = await super()._subscribe(symbol, channel, wss_url)
         msg = json.dumps(dict(event='subscribe', channel=channel,
                                 symbol=symbol))
         logger.info(msg)
@@ -78,7 +62,7 @@ class BitfinexWebsocketClient(WebsocketClient):
                 channel_info = msg
                 logger.info(channel_info)
                 break
-        return channel_info 
+        return ws, channel_info
 
     async def _unsubscribe(self, ws, channel_info):
         msg = json.dumps(dict(event='unsubscribe', chanId=channel_info['chanId']))
@@ -143,6 +127,7 @@ if __name__=='__main__':
     # Simple example of how these should be used
     # Test with: python -m numismatic.feeds.bitfinex
     logging.basicConfig(level=logging.INFO)
+    import asyncio
     from streamz import Stream
     output_stream = Stream()
     printer = output_stream.map(print)

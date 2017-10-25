@@ -1,6 +1,5 @@
 from itertools import product
 import logging
-import asyncio
 import json
 import time
 
@@ -62,36 +61,16 @@ class LunoWebsocketClient(WebsocketClient):
     api_key_secret = attr.ib(default=None, repr=False)
 
 
-    async def listen(self, symbol):
-        symbol = symbol.upper()
-        await super().listen(symbol)
-        ws = await self._subscribe(symbol)
-        while True:
-            try:
-                packet = await ws.recv()
-                msg = self._handle_packet(packet, symbol)
-            except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = await self._unsubscribe(ws, symbol)
-            except Exception as ex:
-                logger.error(ex)
-                logger.error(packet)
-                raise
-
-    async def _subscribe(self, symbol):
-        wss_url = f'{self.wss_url}/{symbol}'
-        logger.info(f'Connecting to {wss_url} ...')
-        ws = await websockets.connect(wss_url)
+    async def _subscribe(self, symbol, channel=None, wss_url=None):
+        if wss_url is None:
+            wss_url = f'{self.wss_url}/{symbol}'
+        ws, channel_info = await super()._subscribe(symbol, channel, wss_url)
         credentials = dict(api_key_id=self.api_key_id,
                            api_key_secret=self.api_key_secret)
         await ws.send(json.dumps(credentials))
         packet = await ws.recv()
         self._handle_order_book(packet, symbol)
-        return ws
-
-    @classmethod
-    async def _unsubscribe(cls, ws, symbol):
-        return True
+        return ws, channel_info
 
     def _handle_order_book(self, packet, symbol):
         timestamp = time.time()
@@ -162,6 +141,7 @@ if __name__=='__main__':
     # Test with: python -m numismatic.exchanges.luno
     from configparser import ConfigParser
     from pathlib import Path
+    import asyncio
     from streamz import Stream
     logging.basicConfig(level=logging.INFO)
     config = ConfigParser()

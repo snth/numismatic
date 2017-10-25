@@ -1,11 +1,13 @@
 import logging
 import time
+import asyncio
 import abc
 from pathlib import Path
 import gzip
 
 from streamz import Stream
 import attr
+import websockets
 
 from ..libs.requesters import Requester
 
@@ -71,8 +73,18 @@ class WebsocketClient(abc.ABC):
     raw_stream = attr.ib(default=None)
     raw_interval = attr.ib(default=1)
 
+    @classmethod
+    async def _connect(cls, wss_url=None):
+        if wss_url is None:
+            wss_url = cls.wss_url
+        logger.info(f'Connecting to {wss_url!r} ...')
+        ws = await websockets.connect(wss_url)
+        if hasattr(cls, 'on_connect'):
+            await cls.on_connect(ws)
+        return ws
+
     @abc.abstractmethod
-    async def listen(self, symbol):
+    async def _subscribe(self, symbol, channel=None, wss_url=None):
         if self.raw_stream is not None:
             # FIXME: Use a FileCollector here
             if self.raw_stream=='':
@@ -95,6 +107,30 @@ class WebsocketClient(abc.ABC):
              .filter(len)
              .sink(write_to_file)
              )
+
+        ws = await self._connect(wss_url)
+        channel_info = {'channel': channel}
+        return ws, channel_info
+
+    @classmethod
+    async def _unsubscribe(cls, ws, symbol):
+        return True
+
+    async def listen(self, symbol, channel=None, wss_url=None):
+        symbol = symbol.upper()
+        ws, channel_info = await self._subscribe(symbol,  channel, wss_url)
+        while True:
+            try:
+                packet = await ws.recv()
+                msg = self._handle_packet(packet, symbol)
+            except asyncio.CancelledError:
+                ## unsubscribe
+                confirmation = \
+                    await asyncio.shield(self._unsubscribe(ws, channel_info))
+            except Exception as ex:
+                logger.error(ex)
+                logger.error(packet)
+                raise
              
 
     @abc.abstractmethod
