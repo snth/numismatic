@@ -37,7 +37,7 @@ class Feed(abc.ABC):
     def __getattr__(self, attr):
         if self.rest_client is not None and hasattr(self.rest_client, attr):
             return getattr(self.rest_client, attr)
-        elif self.websocket_client is not None and hasattr(self.ws_api, attr):
+        elif self.websocket_client is not None and hasattr(self.websocket_client, attr):
             return getattr(self.websocket_client, attr)
         else:
             raise AttributeError
