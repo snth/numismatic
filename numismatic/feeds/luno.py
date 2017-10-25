@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class LunoFeed(Feed):
 
     def __init__(self, **kwargs):
-        self.rest_api = LunoRestApi(**{a.name:kwargs[a.name] 
+        self.rest_client = LunoRestApi(**{a.name:kwargs[a.name] 
                                        for a in attr.fields(LunoRestApi) 
                                        if a.name in kwargs})
         self.websocket_client = LunoWebsocketClient(**{a.name:kwargs[a.name] for a 
@@ -25,7 +25,7 @@ class LunoFeed(Feed):
                                           if a.name in kwargs})
 
     def get_list(self):
-        tickers = self.rest_api.get_tickers()
+        tickers = self.rest_client.get_tickers()
         return [ticker['pair'] for ticker in tickers]
 
     def get_info(self, assets):
@@ -34,7 +34,7 @@ class LunoFeed(Feed):
     def get_prices(self, assets, currencies):
         assets = assets.upper().split(',')
         currencies = currencies.upper().split(',')
-        tickers = self.rest_api.get_tickers()
+        tickers = self.rest_client.get_tickers()
         pairs = {f'{asset}{currency}' for asset, currency in 
                  product(assets, currencies)}
         return [ticker for ticker in tickers if ticker['pair'] in pairs]

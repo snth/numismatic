@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class BitfinexFeed(Feed):
 
     def __init__(self, **kwargs):
-        self.rest_api = None
+        self.rest_client = None
         self.websocket_client = BitfinexWebsocketClient(**{a.name:kwargs[a.name] for a in 
                                               attr.fields(BitfinexWebsocketClient)
                                               if a.name in kwargs})
