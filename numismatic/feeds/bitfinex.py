@@ -41,35 +41,37 @@ class BitfinexWebsocketClient(WebsocketClient):
     wss_url = 'wss://api.bitfinex.com/ws/2'
     exchange = 'Bitfinex'
 
-    @classmethod
-    async def on_connect(cls, ws):
-        packet = await ws.recv()
+    async def on_connect(self, ws):
+        packet = await self.websocket.recv()
         connection_status = json.loads(packet)
         logger.info(connection_status)
         return ws
 
     async def _subscribe(self, symbol, channel='trades', wss_url=None):
-        ws, channel_info = await super()._subscribe(symbol, channel, wss_url)
-        msg = json.dumps(dict(event='subscribe', channel=channel,
-                                symbol=symbol))
+        subscription = await super()._subscribe(symbol, channel, wss_url)
+        msg = json.dumps(dict(event='subscribe', channel=channel, 
+                              symbol=symbol))
         logger.info(msg)
-        await ws.send(msg)
+        await self.websocket.send(msg)
+        # FIXME: put this into a subscription packet handler
         while True:
-            packet = await ws.recv()
+            packet = await self.websocket.recv()
             msg = self._handle_packet(packet, symbol)
             if isinstance(msg, dict) and 'event' in msg and \
                     msg['event']=='subscribed':
                 channel_info = msg
                 logger.info(channel_info)
                 break
-        return ws, channel_info
+        return subscription
 
-    async def _unsubscribe(self, ws, channel_info):
-        msg = json.dumps(dict(event='unsubscribe', chanId=channel_info['chanId']))
+    async def _unsubscribe(self, subscription):
+        channel_info = subscription.channel_info
+        msg = json.dumps(dict(event='unsubscribe', 
+                              chanId=channel_info['chanId']))
         logger.info(msg)
-        await ws.send(msg)
+        await self.websocket.send(msg)
         while True:
-            packet = await ws.recv()
+            packet = await self.websocket.recv()
             msg = self._handle_packet(packet, channel_info['pair'])
             if isinstance(msg, dict) and 'event' in msg and \
                     msg['event']=='unsubscribed':
@@ -78,8 +80,9 @@ class BitfinexWebsocketClient(WebsocketClient):
                 break
         return confirmation
 
-    def _handle_packet(self, packet, symbol):
-        super()._handle_packet(packet, symbol)
+    def _handle_packet(self, packet, subscription):
+        super()._handle_packet(packet, subscription)
+        symbol = subscription.symbol
         msg = json.loads(packet)
         if isinstance(msg, dict) and 'event' in msg:
             pass
@@ -87,7 +90,7 @@ class BitfinexWebsocketClient(WebsocketClient):
             if len(msg) in {2,3} and msg[1]=='hb':
                 msg = Heartbeat(exchange=self.exchange, symbol=symbol,
                                 timestamp=time.time())
-                self.output_stream.emit(msg)
+                subscription.event_stream.emit(msg)
             elif len(msg)==3:
                 try:
                     channel_id, trade_type, (trade_id, timestamp, volume, price) = msg
@@ -99,14 +102,14 @@ class BitfinexWebsocketClient(WebsocketClient):
                 msg = Trade(exchange=self.exchange, symbol=symbol, 
                             timestamp=timestamp/1000, price=price, volume=volume,
                             id=trade_id)
-                self.output_stream.emit(msg)
+                subscription.event_stream.emit(msg)
             elif len(msg)==2 and isinstance(msg[1], list):
                 # snapshot
                 for (trade_id, timestamp, volume, price) in reversed(msg[1]):
                     msg = Trade(exchange=self.exchange, symbol=symbol, 
                                 timestamp=timestamp/1000, price=price, 
                                 volume=volume, id=trade_id)
-                    self.output_stream.emit(msg)
+                    subscription.event_stream.emit(msg)
             else:
                 msg = None
         else:
@@ -118,8 +121,8 @@ class BitfinexWebsocketClient(WebsocketClient):
         'Simple ping pong for testing the connection'
         # try ping-pong
         msg = json.dumps({'event':'ping'})
-        await ws.send(msg)
-        pong = await ws.recv()
+        await self.websocket.send(msg)
+        pong = await self.websocket.recv()
         return pong
 
 

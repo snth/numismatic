@@ -43,23 +43,26 @@ class GDAXWebsocketClient(WebsocketClient):
     exchange = 'GDAX'
 
     async def _subscribe(self, symbol, channel, wss_url=None):
-        ws, channel_info = await super()._subscribe(symbol, channel, wss_url)
+        subscription = await super()._subscribe(symbol, channel, wss_url)
         msg = dict(type='subscribe', product_ids=symbol.split(','),
                    channels=channel.split(','))
         packet = json.dumps(msg)
         logger.info(packet)
-        await ws.send(packet)
+        await self.websocket.send(packet)
+        # FIXME: move this into a packet handler
         while True:
-            packet = await ws.recv()
-            msg = self._handle_packet(packet, symbol)
+            packet = await self.websocket.recv()
+            msg = self._handle_packet(packet, subscription)
             if isinstance(msg, dict) and 'type' in msg and \
                     msg['type']=='subscriptions':
                 channel_info = msg
                 logger.info(channel_info)
                 break
-        return ws, channel_info
+        subscription.channel_info.update(channel_info)
+        return subscription
 
-    async def _unsubscribe(self, ws, channel_info):
+    async def _unsubscribe(self, subscription):
+        channel_info = subscription.channel_info
         symbols = {symbol for channel in channel_info['channels'] 
                    for symbol in channel['product_ids']}
         channels = [channel['name'] for channel in channel_info['channels']]
@@ -67,15 +70,16 @@ class GDAXWebsocketClient(WebsocketClient):
                    channels=channels)
         packet = json.dumps(msg)
         logger.info(msg)
-        await ws.send(msg)
+        await self.websocket.send(msg)
         while True:
-            packet = await ws.recv()
-            msg = self._handle_packet(packet, 'N/A')
+            packet = await self.websocket.recv()
+            msg = self._handle_packet(packet, subscription)
             break
         return msg
 
-    def _handle_packet(self, packet, symbol):
-        super()._handle_packet(packet, symbol)
+    def _handle_packet(self, packet, subscription):
+        super()._handle_packet(packet, subscription)
+        symbol = subscription.symbol
         msg = json.loads(packet)
         if not isinstance(msg, dict):
             raise TypeError('msg: {msg}'.format(msg=msg))
@@ -88,7 +92,7 @@ class GDAXWebsocketClient(WebsocketClient):
         if 'type' in msg and msg['type']=='heartbeat':
             msg = Heartbeat(exchange=self.exchange, symbol=symbol,
                             timestamp=timestamp)
-            self.output_stream.emit(msg)
+            subscription.event_stream.emit(msg)
         elif 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
             sign = -1 if ('side' in msg and msg['side']=='sell') else 1
             price = msg['price']
@@ -97,9 +101,9 @@ class GDAXWebsocketClient(WebsocketClient):
             msg = Trade(exchange=self.exchange, symbol=symbol, 
                         timestamp=timestamp, price=price, volume=volume,
                         id=trade_id)
-            self.output_stream.emit(msg)
+            subscription.event_stream.emit(msg)
         elif isinstance(msg, dict):
-            self.output_stream.emit(msg)
+            subscription.event_stream.emit(msg)
         else:
             raise NotImplementedError(msg)
         return msg

@@ -18,6 +18,15 @@ LIBRARY_NAME = 'numismatic'
 
 
 @attr.s
+class Subscription:
+    market_name = attr.ib()
+    symbol = attr.ib()
+    channel_info = attr.ib(default=attr.Factor(dict))
+    raw_stream = attr.ib(default=attr.Factory(Stream))
+    event_stream = attr.ib(default=attr.Factory(Stream))
+
+
+@attr.s
 class Feed(abc.ABC):
     "Feed Base class"
 
@@ -69,64 +78,45 @@ class RestClient(abc.ABC):
 class WebsocketClient(abc.ABC):
     '''Base class for WebsocketClient feeds'''
     # TODO: Write to a separate stream
-    output_stream = attr.ib(default=None)
-    raw_stream = attr.ib(default=None)
-    raw_interval = attr.ib(default=1)
+    websocket = attr.ib(default=None)
+    subscriptions = attr.ib(default=attr.Factory(dict))
 
-    @classmethod
-    async def _connect(cls, wss_url=None):
+    async def _connect(self, wss_url=None):
         if wss_url is None:
-            wss_url = cls.wss_url
+            wss_url = self.wss_url
         logger.info(f'Connecting to {wss_url!r} ...')
-        ws = await websockets.connect(wss_url)
-        if hasattr(cls, 'on_connect'):
-            await cls.on_connect(ws)
-        return ws
+        self.websocket = await websockets.connect(wss_url)
+        if hasattr(self, 'on_connect'):
+            await self.on_connect(ws)
+        return self.websocket
 
     @abc.abstractmethod
     async def _subscribe(self, symbol, channel=None, wss_url=None):
-        if self.raw_stream is not None:
-            # FIXME: Use a FileCollector here
-            if self.raw_stream=='':
-                from appdirs import user_cache_dir
-                self.raw_stream = user_cache_dir(LIBRARY_NAME)
-            date = time.strftime('%Y%m%dT%H%M%S')
-            filename = f'{self.exchange}_{symbol}_{date}.json.gz'
-            raw_stream_path = str(Path(self.raw_stream) / filename)
-            logger.info(f'Writing raw stream to {raw_stream_path} ...')
-
-            def write_to_file(batch):
-                logger.debug(f'Writing batch of {len(batch)} for {symbol} ...')
-                with gzip.open(raw_stream_path, 'at') as f:
-                    for packet in batch:
-                        f.write(packet+'\n')
-
-            self.raw_stream = Stream()
-            (self.raw_stream
-             .timed_window(self.raw_interval)
-             .filter(len)
-             .sink(write_to_file)
-             )
-
+        # connect
         ws = await self._connect(wss_url)
         channel_info = {'channel': channel}
-        return ws, channel_info
+        # set up the subscription
+        market_name = f'{self.exchange_name}--{symbol}--{channel}'
+        subscription = Subscription(market_name=market_name, symbol=symbol,
+                                    channel_info=channel_info)
+        self.subscriptions[market_name] = subscription
+        return subscription
 
-    @classmethod
-    async def _unsubscribe(cls, ws, symbol):
+    async def _unsubscribe(self, subscription):
+        del self.subscriptions[subscription.market_name]
         return True
 
     async def listen(self, symbol, channel=None, wss_url=None):
         symbol = symbol.upper()
-        ws, channel_info = await self._subscribe(symbol,  channel, wss_url)
+        subscription = await self._subscribe(symbol,  channel, wss_url)
         while True:
             try:
                 packet = await ws.recv()
-                msg = self._handle_packet(packet, symbol)
+                msg = self._handle_packet(packet, subscription)
             except asyncio.CancelledError:
                 ## unsubscribe
                 confirmation = \
-                    await asyncio.shield(self._unsubscribe(ws, channel_info))
+                    await asyncio.shield(self._unsubscribe(subscription))
             except Exception as ex:
                 logger.error(ex)
                 logger.error(packet)
@@ -134,7 +124,6 @@ class WebsocketClient(abc.ABC):
              
 
     @abc.abstractmethod
-    def _handle_packet(self, packet, symbol):
+    def _handle_packet(self, packet, subscription):
         # record the raw packets on the raw_stream
-        if self.raw_stream is not None:
-            self.raw_stream.emit(packet)
+        subscription.raw_stream.emit(packet)
