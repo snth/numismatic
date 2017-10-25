@@ -15,6 +15,7 @@ class FileCollector(Collector):
     interval = attr.ib(default=None)
 
     def __attrs_post_init__(self):
+        # paths
         if self.path=='-':
             self._opener = lambda: sys.stdout
         elif self.path.endswith('.gz'):
@@ -23,21 +24,22 @@ class FileCollector(Collector):
             self._opener = partial(open, self.path, mode='at')
 
         if self.format=='text':
-            self.source_stream = self.source_stream.map(
+            self.event_stream = self.event_stream.map(
                 lambda ev: str(ev)+'\n')
         elif self.format=='json':
-            self.source_stream = self.source_stream.map(
+            self.event_stream = self.event_stream.map(
                 lambda ev: str(ev.json())+'\n')
         else:
             raise NotImplementedError(f'format={self.format!r}')
+        # construct data_stream
         if self.interval:
-            self.source_stream = \
-                self.source_stream.timed_window(interval=self.interval)
+            self._data_stream = \
+                self.event_stream.timed_window(interval=self.interval)
         else:
             # ensure downstream receives lists rather than elements
-            self.source_stream = \
-                self.source_stream.partition(1)
-        self.source_stream.sink(self.write)
+            self._data_stream = \
+                self.event_stream.partition(1)
+        self._data_stream.sink(self.write)
 
     def write(self, data):
         # TODO: Use aiofiles for non-blocking IO here
