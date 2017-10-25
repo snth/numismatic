@@ -5,7 +5,7 @@ import time
 from datetime import timedelta
 from dateutil.parser import parse
 
-from .base import Feed
+from .base import Feed, RestApi
 from ..libs.utils import date_range, make_list_str, to_datetime, \
     dates_and_frequencies
 
@@ -14,28 +14,21 @@ logger = logging.getLogger(__name__)
 
 
 class CryptoCompareFeed(Feed):
-    '''Low level API for CryptoCompare.com
 
-    TODO:
-      * This should use the json api to automatically generate the methods
-    '''
-
-    base_url = 'https://www.cryptocompare.com/api/data/'
-    api_url = 'https://min-api.cryptocompare.com/data'
     _interval_limit = 2000
 
     def __init__(self, requester='basic', cache_dir=None):
-        super().__init__(requester=requester, cache_dir=cache_dir)
+        self.rest_api = CryptoCompareRestApi(requester=requester,
+                                             cache_dir=cache_dir)
+        self.ws_api = None
 
     def get_list(self):
-        api_url = f'{self.base_url}/coinlist'
-        coinlist = self._make_request(api_url)
+        return self.rest_api.get_coinlist()
         return coinlist.keys()
 
     def get_info(self, assets):
-        api_url = f'{self.base_url}/coinlist'
-        coinlist = self._make_request(api_url)
         assets = assets.upper().split(',')
+        coinlist = self.rest_api.get_coinlist()
         assets_info = [coinlist[a] for a in assets]
         return assets_info
 
@@ -43,7 +36,7 @@ class CryptoCompareFeed(Feed):
         assets = assets.upper().split(',')
         currencies = currencies.upper().split(',')
         # FIXME: SHouldn't use caching
-        data = self.get_latest_price_multi(assets, currencies)
+        data = self.rest_api.get_latest_price_multi(assets, currencies)
         prices = [{'asset':asset, 'currency':currency, 'price':price}
                   for asset, asset_prices in data.items()
                   for currency, price in asset_prices.items()]
@@ -65,21 +58,40 @@ class CryptoCompareFeed(Feed):
             logger.debug(f'Getting {asset}/{currency} for {limit}{freqstr} to {end}')
             time.sleep(1/4)   # max 4 requests per second
             if freq.startswith('m'):
-                chunk = self.get_historical_minute(
+                chunk = self.rest_api.get_historical_minute(
                     fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             elif freq.startswith('h'):
-                chunk = self.get_historical_hour(
+                chunk = self.rest_api.get_historical_hour(
                     fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             elif freq.startswith('d'):
-                chunk = self.get_historical_day(
+                chunk = self.rest_api.get_historical_day(
                     fsym=asset, tsym=currency, e=exchange, limit=limit,
                     toTs=toTs)
             else:
                 raise NotImplementedError(f'freq={freq}')
             data.extend(chunk)
         return data
+
+
+class CryptoCompareRestApi(RestApi):
+    '''Low level API for CryptoCompare.com
+
+    TODO:
+      * This should use the json api to automatically generate the methods
+    '''
+
+    base_url = 'https://www.cryptocompare.com/api/data/'
+    api_url = 'https://min-api.cryptocompare.com/data'
+
+    def __init__(self, requester='basic', cache_dir=None):
+        super().__init__(requester=requester, cache_dir=cache_dir)
+
+    def get_coinlist(self):
+        api_url = f'{self.base_url}/coinlist'
+        coinlist = self._make_request(api_url)
+        return coinlist
 
     def get_latest_price(self, fsym, tsyms):
         api_url = f'{self.api_url}/price'
