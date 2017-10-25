@@ -22,7 +22,8 @@ class Subscription:
     market_name = attr.ib()
     exchange = attr.ib()
     symbol = attr.ib()
-    channel_info = attr.ib(default=attr.Factor(dict))
+    client = attr.ib()
+    channel_info = attr.ib(default=attr.Factory(dict))
     raw_stream = attr.ib(default=attr.Factory(Stream))
     event_stream = attr.ib(default=attr.Factory(Stream))
     handlers = attr.ib(default=attr.Factory(list))
@@ -95,21 +96,23 @@ class WebsocketClient(abc.ABC):
         logger.info(f'Connecting to {wss_url!r} ...')
         self.websocket = await websockets.connect(wss_url)
         if hasattr(self, 'on_connect'):
-            await self.on_connect(ws)
+            await self.on_connect(self.websocket)
         return self.websocket
 
     @abc.abstractmethod
     async def _subscribe(self, symbol, channel=None, wss_url=None):
-        # connect
-        ws = await self._connect(wss_url)
-        channel_info = {'channel': channel}
         # set up the subscription
-        market_name = f'{self.exchange_name}--{symbol}--{channel}'
+        market_name = f'{self.exchange}--{symbol}--{channel}'
+        channel_info = {'channel': channel}
         subscription = Subscription(market_name=market_name,
-                                    exchang=self.exchange, symbol=symbol,
-                                    channel_info=channel_info,
+                                    exchange=self.exchange, symbol=symbol,
+                                    channel_info=channel_info, client=self,
                                     handlers=self.get_handlers())
+        print(subscription)
         self.subscriptions[market_name] = subscription
+        print(self.subscriptions)
+        # connect
+        self.websocket = await self._connect(wss_url)
         return subscription
 
     async def _unsubscribe(self, subscription):
@@ -121,8 +124,8 @@ class WebsocketClient(abc.ABC):
         subscription = await self._subscribe(symbol,  channel, wss_url)
         while True:
             try:
-                packet = await ws.recv()
-                msg = self._handle_packet(packet, subscription)
+                packet = await self.websocket.recv()
+                msg = self.__handle_packet(packet, subscription)
             except asyncio.CancelledError:
                 ## unsubscribe
                 confirmation = \
@@ -133,8 +136,8 @@ class WebsocketClient(abc.ABC):
                 raise
              
 
-    @abc.abstractmethod
-    def _handle_packet(self, packet, subscription):
+    @staticmethod
+    def __handle_packet(packet, subscription):
         # record the raw packets on the raw_stream
         subscription.raw_stream.emit(packet)
         try:

@@ -5,7 +5,7 @@ from collections import namedtuple
 import asyncio
 
 from tornado.platform.asyncio import AsyncIOMainLoop
-from streamz import Stream
+from streamz import Stream, union
 import attr
 
 from .collectors import Collector
@@ -70,7 +70,8 @@ def coin(state, feed, cache_dir, requester, log_level):
     state['datafeed'] = Feed.factory(feed, cache_dir=cache_dir,
                                      requester=requester)
     state['output_stream'] = Stream()
-    state['subscriptions'] = {}
+    state['listeners'] = {}
+    state['feeds'] = []
 
 @coin.command(name='list')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
@@ -173,7 +174,8 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
     currencies = ','.join(currencies).upper().split(',')
     pairs = list(map('/'.join, product(assets, currencies)))
     output_stream = state['output_stream']
-    subscriptions = state['subscriptions']
+    listeners = state['listeners']
+    feeds = state['feeds']
     # FIXME: each pair should get a separate stream which we should keep track
     #        of in state['streams'].
     if feed_name=='bitfinex':
@@ -184,8 +186,9 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
                                 output_stream=output_stream,
                                 raw_stream=raw_output,
                                 raw_interval=raw_interval)
-            subscription = feed.listen(pair, channel)
-            subscriptions[f'{pair}-{feed_name}'] = subscription
+            feeds.append(feed)
+            listener = feed.listen(pair, channel)
+            listeners[f'{pair}-{feed_name}'] = listener
     elif feed_name=='gdax':
         if channel=='trades':
             # FIXME: handle this mapping in a better way
@@ -196,8 +199,9 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
                                 output_stream=output_stream,
                                 raw_stream=raw_output,
                                 raw_interval=raw_interval)
-            subscription = feed.listen(pair, channel)
-            subscriptions[f'{pair}-{feed_name}'] = subscription
+            feeds.append(feed)
+            listener = feed.listen(pair, channel)
+            listeners[f'{pair}-{feed_name}'] = listener
     elif feed_name=='luno':
         if api_key_id is None:
             api_key_id = (config['Luno'].get('api_key_id', '') if 'Luno' in
@@ -210,15 +214,17 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
                             raw_interval=raw_interval,
                             api_key_id=api_key_id,
                             api_key_secret=api_key_secret)
+        feeds.append(feed)
         for pair in pairs:
             pair = pair.replace('/', '')
-            subscription = feed.listen(pair)
-            subscriptions[f'{pair}-{feed_name}'] = subscription
+            listener = feed.listen(pair)
+            listeners[f'{pair}-{feed_name}'] = listener
     else:
         raise NotImplementedError()
 
 
 @coin.command()
+@click.option('--market', '-m', default='all')
 @click.option('--collector', '-c', default='file', 
               type=click.Choice(Collector._get_subclasses().keys()))
 @click.option('--output', '-o', default='-', type=click.Path())
@@ -230,11 +236,20 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
 @click.option('--json', 'format', flag_value='json')
 @click.option('--interval', '-i', default=None, type=float)
 @pass_state
-def collect(state, collector, filter, type, output, format, interval):
+def collect(state, market, collector, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
-    output_stream = state['output_stream']
+    subscriptions = {}
+    for feed in state['feeds']:
+        print(feed)
+        print(feed.subscriptions)
+        subscriptions.update(feed.subscriptions)
+    if market=='all':
+        print([sub.market_name for sub in subscriptions])
+        event_stream = union([sub.event_stream for sub in subscriptions])
+    else:
+        event_stream = subscriptions[market].event_stream
     collector_name = collector
-    collector = Collector.factory(collector_name, source_stream=output_stream,
+    collector = Collector.factory(collector_name, event_stream=event_stream,
                                   path=output, format=format, types=type,
                                   filters=filter, interval=interval)
     # state['collectors'].append(collector)
@@ -250,10 +265,10 @@ def run(state, timeout):
     if not timeout:
         # Allow to run indefinitely if timeout==0
         timeout = None
-    subscriptions = state['subscriptions']
+    listeners = state['listeners']
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
-    tasks = {name:asyncio.Task(sub) for name, sub in subscriptions.items()}
+    tasks = {name:asyncio.Task(sub) for name, sub in listeners.items()}
     try:
         completed, pending = \
             loop.run_until_complete(asyncio.wait(tasks.values(), 

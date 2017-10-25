@@ -44,22 +44,26 @@ class GDAXWebsocketClient(WebsocketClient):
 
     async def _subscribe(self, symbol, channel, wss_url=None):
         subscription = await super()._subscribe(symbol, channel, wss_url)
+        # install only the subscriptions handler
+        subscription.handlers = [self.__handle_subscriptions]
         msg = dict(type='subscribe', product_ids=symbol.split(','),
                    channels=channel.split(','))
         packet = json.dumps(msg)
         logger.info(packet)
         await self.websocket.send(packet)
-        # FIXME: move this into a packet handler
-        while True:
-            packet = await self.websocket.recv()
-            msg = self._handle_packet(packet, subscription)
-            if isinstance(msg, dict) and 'type' in msg and \
-                    msg['type']=='subscriptions':
-                channel_info = msg
-                logger.info(channel_info)
-                break
-        subscription.channel_info.update(channel_info)
         return subscription
+
+    @staticmethod
+    def __handle_subscriptions(msg, subscription):
+        if isinstance(msg, dict) and 'type' in msg and \
+                msg['type']=='subscriptions':
+            channel_info = msg
+            logger.info(channel_info)
+            subscription.channel_info.update(channel_info)
+            # install the proper handlers
+            subscription.handlers = subscription.client.get_handlers()
+            # stop processing other handlers
+            raise StopIteration
 
     async def _unsubscribe(self, subscription):
         channel_info = subscription.channel_info
@@ -83,6 +87,8 @@ class GDAXWebsocketClient(WebsocketClient):
             event = Heartbeat(exchange=subscription.exchange, 
                               symbol=subscription, timestamp=timestamp)
             subscription.event_stream.emit(event)
+            # stop processing other handlers
+            raise StopIteration
 
     @staticmethod
     def handle_trade(msg, subscription):
@@ -100,6 +106,8 @@ class GDAXWebsocketClient(WebsocketClient):
                         timestamp=timestamp, price=price, volume=volume,
                         id=trade_id)
             subscription.event_stream.emit(msg)
+            # stop processing other handlers
+            raise StopIteration
 
 
 if __name__=='__main__':

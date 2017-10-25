@@ -69,40 +69,37 @@ class LunoWebsocketClient(WebsocketClient):
                            api_key_secret=self.api_key_secret)
         await self.websocket.send(json.dumps(credentials))
         packet = await self.websocket.recv()
-        self._handle_order_book(packet, subscription)
         return subscription
 
-    def handle_order_book(self, packet, subscription):
+    @staticmethod
+    def handle_order_book(msg, subscription):
         timestamp = time.time()
-        super()._handle_packet(packet, subscription)
-        order_book = json.loads(packet)
-        if 'asks' in order_book:
+        if 'asks' in msg:
             sign = -1
-            for order in order_book['asks']:
+            for order in msg['asks']:
                 id = order['id']
                 volume = float(order['volume'])
                 price = sign * float(order['price'])
-                order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
-                                    timestamp=timestamp, price=price,
-                                    volume=volume, id=id)
+                order_ev = LimitOrder(exchange=subscription.exchange,
+                                      symbol=subscription.symbol,
+                                      timestamp=timestamp, price=price,
+                                      volume=volume, id=id)
                 subscription.event_stream.emit(order_ev)
-        if 'bids' in order_book:
+        if 'bids' in msg:
             sign = 1
-            for order in order_book['bids']:
+            for order in msg['bids']:
                 id = order['id']
                 volume = float(order['volume'])
                 price = sign * float(order['price'])
-                order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
-                                    timestamp=timestamp, price=price,
-                                    volume=volume, id=id)
+                order_ev = LimitOrder(exchange=subscription.exchange,
+                                      symbol=subscription.symbol,
+                                      timestamp=timestamp, price=price,
+                                      volume=volume, id=id)
                 subscription.event_stream.emit(order_ev)
-        return order_book
+        if 'asks' in msg and 'bids' in msg:
+            raise StopIteration
 
-    def handle_trades(self, packet, subscription):
-        msg = json.loads(packet)
-        if not msg:
-            # sometimes we receive empty packets
-            return msg
+    def handle_trades(self, msg, subscription):
         # TODO: Implement handling of sequence numbers for detecting missing
         #       events
         timestamp = float(msg['timestamp'])/1000
@@ -116,6 +113,7 @@ class LunoWebsocketClient(WebsocketClient):
                                  timestamp=timestamp, price=price,
                                  volume=volume, id=id)
                 subscription.event_stream.emit(trade_ev)
+            # need to process further handlers so no StopIteration
 
     @staticmethod
     def handle_creates(msg, subscription):
@@ -132,6 +130,7 @@ class LunoWebsocketClient(WebsocketClient):
                                   symbol=symbol, timestamp=timestamp,
                                   price=price, volume=volume, id=id)
             subscription.event_stream.emit(order_ev)
+            # need to process further handlers so no StopIteration
 
     @staticmethod
     def handle_deletes(msg, subscription):
@@ -144,6 +143,7 @@ class LunoWebsocketClient(WebsocketClient):
             cancel_ev = CancelOrder(exchange=subscription.exchange,
                                     symbol=symbol, timestamp=timestamp, id=id)
             subscription.event_stream.emit(cancel_ev)
+            # need to process further handlers so no StopIteration
 
 
 if __name__=='__main__':
