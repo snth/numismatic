@@ -80,18 +80,24 @@ class BitfinexWebsocketClient(WebsocketClient):
                 break
         return confirmation
 
-    def _handle_packet(self, packet, subscription):
-        super()._handle_packet(packet, subscription)
-        symbol = subscription.symbol
-        msg = json.loads(packet)
-        if isinstance(msg, dict) and 'event' in msg:
-            pass
-        elif isinstance(msg, list):
-            if len(msg) in {2,3} and msg[1]=='hb':
-                msg = Heartbeat(exchange=self.exchange, symbol=symbol,
+    async def _ping_pong(self):
+        'Simple ping pong for testing the connection'
+        # try ping-pong
+        msg = json.dumps({'event':'ping'})
+        await self.websocket.send(msg)
+        pong = await self.websocket.recv()
+        return pong
+
+    @staticmethod
+    def handle_heartbeat(msg, subscription):
+        if isinstance(msg, list) and if len(msg) in {2,3} and msg[1]=='hb':
+                msg = Heartbeat(exchange=subscription.exchange, symbol=symbol,
                                 timestamp=time.time())
                 subscription.event_stream.emit(msg)
-            elif len(msg)==3:
+
+    @staticmethod
+    def handle_trade(msg, subscription):
+        if isinstance(msg, list) and len(msg)==3:
                 try:
                     channel_id, trade_type, (trade_id, timestamp, volume, price) = msg
                 except TypeError as e:
@@ -99,31 +105,20 @@ class BitfinexWebsocketClient(WebsocketClient):
                     logger.error(msg)
                     raise
                 # FIXME: validate the channel_id below
-                msg = Trade(exchange=self.exchange, symbol=symbol, 
+                msg = Trade(exchange=subscription.exchange, symbol=symbol, 
                             timestamp=timestamp/1000, price=price, volume=volume,
                             id=trade_id)
                 subscription.event_stream.emit(msg)
-            elif len(msg)==2 and isinstance(msg[1], list):
+
+    @staticmethod
+    def handle_snapshot(msg, subscription):
+        if isinstance(msg, list) and len(msg)==2 and isinstance(msg[1], list):
                 # snapshot
                 for (trade_id, timestamp, volume, price) in reversed(msg[1]):
-                    msg = Trade(exchange=self.exchange, symbol=symbol, 
+                    msg = Trade(exchange=subscription.exchange, symbol=symbol, 
                                 timestamp=timestamp/1000, price=price, 
                                 volume=volume, id=trade_id)
                     subscription.event_stream.emit(msg)
-            else:
-                msg = None
-        else:
-            raise NotImplementedError(msg)
-        return msg
-
-    @staticmethod
-    async def _ping_pong(ws):
-        'Simple ping pong for testing the connection'
-        # try ping-pong
-        msg = json.dumps({'event':'ping'})
-        await self.websocket.send(msg)
-        pong = await self.websocket.recv()
-        return pong
 
 
 if __name__=='__main__':

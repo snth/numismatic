@@ -20,10 +20,12 @@ LIBRARY_NAME = 'numismatic'
 @attr.s
 class Subscription:
     market_name = attr.ib()
+    exchange = attr.ib()
     symbol = attr.ib()
     channel_info = attr.ib(default=attr.Factor(dict))
     raw_stream = attr.ib(default=attr.Factory(Stream))
     event_stream = attr.ib(default=attr.Factory(Stream))
+    handlers = attr.ib(default=attr.Factory(list))
 
 
 @attr.s
@@ -81,6 +83,12 @@ class WebsocketClient(abc.ABC):
     websocket = attr.ib(default=None)
     subscriptions = attr.ib(default=attr.Factory(dict))
 
+    @classmethod
+    def get_handlers(cls):
+        return [getattr(cls, attr) for attr in dir(cls)
+                if callable(getattr(cls, attr)) 
+                and attr.startswith('handle_')]
+
     async def _connect(self, wss_url=None):
         if wss_url is None:
             wss_url = self.wss_url
@@ -97,8 +105,10 @@ class WebsocketClient(abc.ABC):
         channel_info = {'channel': channel}
         # set up the subscription
         market_name = f'{self.exchange_name}--{symbol}--{channel}'
-        subscription = Subscription(market_name=market_name, symbol=symbol,
-                                    channel_info=channel_info)
+        subscription = Subscription(market_name=market_name,
+                                    exchang=self.exchange, symbol=symbol,
+                                    channel_info=channel_info,
+                                    handlers=self.get_handlers())
         self.subscriptions[market_name] = subscription
         return subscription
 
@@ -127,3 +137,12 @@ class WebsocketClient(abc.ABC):
     def _handle_packet(self, packet, subscription):
         # record the raw packets on the raw_stream
         subscription.raw_stream.emit(packet)
+        try:
+            msg = json.loads(packet)
+        except:
+            msg = packet
+        if not msg:
+            return
+        # most of the time we get json so only decode that once
+        for handler in subscription.handlers:
+            handler(msg, subscription)

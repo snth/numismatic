@@ -72,8 +72,7 @@ class LunoWebsocketClient(WebsocketClient):
         self._handle_order_book(packet, subscription)
         return subscription
 
-    def _handle_order_book(self, packet, subscription):
-        symbol = subscription.symbol
+    def handle_order_book(self, packet, subscription):
         timestamp = time.time()
         super()._handle_packet(packet, subscription)
         order_book = json.loads(packet)
@@ -99,9 +98,7 @@ class LunoWebsocketClient(WebsocketClient):
                 subscription.event_stream.emit(order_ev)
         return order_book
 
-    def _handle_packet(self, packet, subscription):
-        super()._handle_packet(packet, subscription)
-        symbol = subscription.symbol
+    def handle_trades(self, packet, subscription):
         msg = json.loads(packet)
         if not msg:
             # sometimes we receive empty packets
@@ -115,27 +112,38 @@ class LunoWebsocketClient(WebsocketClient):
                 value = float(trade['counter'])
                 price = value/volume
                 id = trade['order_id']
-                trade_ev = Trade(exchange=self.exchange, symbol=symbol,
+                trade_ev = Trade(exchange=subscription.exchange, symbol=symbol,
                                  timestamp=timestamp, price=price,
                                  volume=volume, id=id)
                 subscription.event_stream.emit(trade_ev)
+
+    @staticmethod
+    def handle_creates(msg, subscription):
+        # TODO: Implement handling of sequence numbers for detecting missing
+        #       events
+        timestamp = float(msg['timestamp'])/1000
         if 'create_update' in msg and msg['create_update']:
             order = msg['create_update']
             sign = 1 if order['type']=='BID' else -1
             id = order['order_id']
             volume = float(order['volume'])
             price = sign * float(order['price'])
-            order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
-                                  timestamp=timestamp, price=price,
-                                  volume=volume, id=id)
+            order_ev = LimitOrder(exchange=subscription.exchange,
+                                  symbol=symbol, timestamp=timestamp,
+                                  price=price, volume=volume, id=id)
             subscription.event_stream.emit(order_ev)
+
+    @staticmethod
+    def handle_deletes(msg, subscription):
+        # TODO: Implement handling of sequence numbers for detecting missing
+        #       events
+        timestamp = float(msg['timestamp'])/1000
         if 'delete_update' in msg and msg['delete_update']:
             delete_update = msg['delete_update']
             id = delete_update['order_id']
-            cancel_ev = CancelOrder(exchange=self.exchange, symbol=symbol,
-                                    timestamp=timestamp, id=id)
+            cancel_ev = CancelOrder(exchange=subscription.exchange,
+                                    symbol=symbol, timestamp=timestamp, id=id)
             subscription.event_stream.emit(cancel_ev)
-        return msg
 
 
 if __name__=='__main__':

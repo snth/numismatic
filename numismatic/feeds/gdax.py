@@ -77,36 +77,29 @@ class GDAXWebsocketClient(WebsocketClient):
             break
         return msg
 
-    def _handle_packet(self, packet, subscription):
-        super()._handle_packet(packet, subscription)
-        symbol = subscription.symbol
-        msg = json.loads(packet)
-        if not isinstance(msg, dict):
-            raise TypeError('msg: {msg}'.format(msg=msg))
-        if 'product_id' in msg:
-            symbol = msg['product_id'].replace('-', '')
-        if 'time' in msg:
-            dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            timestamp = dt.timestamp()
-
+    @staticmethod
+    def handle_heartbeat(msg, subscription):
         if 'type' in msg and msg['type']=='heartbeat':
-            msg = Heartbeat(exchange=self.exchange, symbol=symbol,
-                            timestamp=timestamp)
-            subscription.event_stream.emit(msg)
-        elif 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
+            event = Heartbeat(exchange=subscription.exchange, 
+                              symbol=subscription, timestamp=timestamp)
+            subscription.event_stream.emit(event)
+
+    @staticmethod
+    def handle_trade(msg, subscription):
+        if 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
+            if 'product_id' in msg:
+                symbol = msg['product_id'].replace('-', '')
+            if 'time' in msg:
+                dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                timestamp = dt.timestamp()
             sign = -1 if ('side' in msg and msg['side']=='sell') else 1
             price = msg['price']
             volume = sign * msg['last_size'] if 'last_size' in msg else 0
             trade_id = msg['trade_id']
-            msg = Trade(exchange=self.exchange, symbol=symbol, 
+            msg = Trade(exchange=subscription.exchange, symbol=symbol, 
                         timestamp=timestamp, price=price, volume=volume,
                         id=trade_id)
             subscription.event_stream.emit(msg)
-        elif isinstance(msg, dict):
-            subscription.event_stream.emit(msg)
-        else:
-            raise NotImplementedError(msg)
-        return msg
 
 
 if __name__=='__main__':
