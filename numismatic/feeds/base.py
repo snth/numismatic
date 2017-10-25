@@ -44,7 +44,7 @@ class Feed(abc.ABC):
 
 
 @attr.s
-class RestApi(abc.ABC):
+class RestClient(abc.ABC):
 
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')

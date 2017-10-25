@@ -8,7 +8,7 @@ import attr
 import websockets
 
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
-from .base import Feed, RestApi, WebsocketClient
+from .base import Feed, RestClient, WebsocketClient
 
 
 logger = logging.getLogger(__name__)
@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 class LunoFeed(Feed):
 
     def __init__(self, **kwargs):
-        self.rest_client = LunoRestApi(**{a.name:kwargs[a.name] 
-                                       for a in attr.fields(LunoRestApi) 
+        self.rest_client = LunoRestClient(**{a.name:kwargs[a.name] 
+                                       for a in attr.fields(LunoRestClient) 
                                        if a.name in kwargs})
         self.websocket_client = LunoWebsocketClient(**{a.name:kwargs[a.name] for a 
                                           in attr.fields(LunoWebsocketClient)
@@ -40,7 +40,7 @@ class LunoFeed(Feed):
         return [ticker for ticker in tickers if ticker['pair'] in pairs]
 
 
-class LunoRestApi(RestApi):
+class LunoRestClient(RestClient):
 
     api_url = 'https://api.mybitx.com/api/1/'
 

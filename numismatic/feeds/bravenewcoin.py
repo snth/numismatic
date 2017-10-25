@@ -1,6 +1,6 @@
 import logging
 
-from .base import Feed, RestApi
+from .base import Feed, RestClient
 from ..libs.config import get_config
 
 
@@ -11,7 +11,7 @@ class BraveNewCoinFeed(Feed):
 
     def __init__(self, requester='basic', cache_dir=None, api_key_id=None,
                  api_key_secret=None):
-        self.rest_client = BraveNewCoinRestApi(
+        self.rest_client = BraveNewCoinRestClient(
             requester=requester, cache_dir=cache_dir, api_key_id=api_key_id,
             api_key_secret=api_key_secret)
         self.websocket_client = None
@@ -39,7 +39,7 @@ class BraveNewCoinFeed(Feed):
         return response
 
 
-class BraveNewCoinRestApi(RestApi):
+class BraveNewCoinRestClient(RestClient):
 
     api_url = 'https://bravenewcoin-v1.p.mashape.com/'
 

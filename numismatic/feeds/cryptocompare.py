@@ -5,7 +5,7 @@ import time
 from datetime import timedelta
 from dateutil.parser import parse
 
-from .base import Feed, RestApi
+from .base import Feed, RestClient
 from ..libs.utils import date_range, make_list_str, to_datetime, \
     dates_and_frequencies
 
@@ -18,7 +18,7 @@ class CryptoCompareFeed(Feed):
     _interval_limit = 2000
 
     def __init__(self, requester='basic', cache_dir=None):
-        self.rest_client = CryptoCompareRestApi(requester=requester,
+        self.rest_client = CryptoCompareRestClient(requester=requester,
                                              cache_dir=cache_dir)
         self.websocket_client = None
 
@@ -75,7 +75,7 @@ class CryptoCompareFeed(Feed):
         return data
 
 
-class CryptoCompareRestApi(RestApi):
+class CryptoCompareRestClient(RestClient):
     '''Low level API for CryptoCompare.com
 
     TODO:
