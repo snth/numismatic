@@ -8,7 +8,7 @@ import attr
 import websockets
 
 from .base import Feed, WebsocketClient, STOP_HANDLERS
-from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
+from ..events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
 

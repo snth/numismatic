@@ -12,7 +12,7 @@ from streamz import Stream
 import attr
 import websockets
 
-from ..libs.requesters import Requester
+from ..requesters import Requester
 
 logger = logging.getLogger(__name__)
 

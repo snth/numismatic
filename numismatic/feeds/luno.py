@@ -6,7 +6,7 @@ import time
 import attr
 import websockets
 
-from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
+from ..events import Heartbeat, Trade, LimitOrder, CancelOrder
 from .base import Feed, RestClient, WebsocketClient, STOP_HANDLERS
 from ..libs.config import get_config
 
