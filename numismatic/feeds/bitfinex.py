@@ -38,8 +38,8 @@ class BitfinexWebsocketClient(WebsocketClient):
     This could probably be handled by having just one socket.
     '''
 
-    wss_url = 'wss://api.bitfinex.com/ws/2'
     exchange = 'Bitfinex'
+    wss_url = 'wss://api.bitfinex.com/ws/2'
 
     async def on_connect(self, ws):
         packet = await self.websocket.recv()
@@ -47,14 +47,14 @@ class BitfinexWebsocketClient(WebsocketClient):
         logger.info(connection_status)
         return ws
 
-    async def _subscribe(self, symbol, channel='trades', wss_url=None):
-        subscription = await super()._subscribe(symbol, channel, wss_url)
+    async def _subscribe(self, subscription):
+        await super()._subscribe(subscription)
         # install only the handle_subscribed handler
         # it needs to go through the main __handle_packet so the raw_stream is
         # updated.
         subscription.handlers = [self.__handle_subscribed]
-        msg = json.dumps(dict(event='subscribe', channel=channel, 
-                              symbol=symbol))
+        msg = json.dumps(dict(event='subscribe', channel=subscription.channel, 
+                              symbol=subscription.symbol))
         logger.info(msg)
         await self.websocket.send(msg)
         return subscription
@@ -66,7 +66,7 @@ class BitfinexWebsocketClient(WebsocketClient):
             subscription.channel_info = msg
             logger.info(channel_info)
             # install the proper handlers
-            subscription.handlers = subscription.client.get_handlers()
+            subscription.handlers = subscription.client._get_handlers()
             # stop processing other handlers
             raise StopIteration
 

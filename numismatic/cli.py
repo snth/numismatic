@@ -70,8 +70,7 @@ def coin(state, feed, cache_dir, requester, log_level):
     state['datafeed'] = Feed.factory(feed, cache_dir=cache_dir,
                                      requester=requester)
     state['output_stream'] = Stream()
-    state['listeners'] = {}
-    state['feeds'] = []
+    state['subscriptions'] = {}
 
 @coin.command(name='list')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
@@ -162,65 +161,20 @@ def tabulate(data):
               "to disk")
 # FIXME: The --channel and --api-key-* options are Feed specific and 
 #        should probably be handled differently.
-@click.option('--channel', '-C', default='trades', type=str)
+@click.option('--channels', '-C', multiple=True, default=['trades'])
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
 def listen(state, feed, assets, currencies, raw_output, raw_interval, 
-           channel, api_key_id, api_key_secret):
+           channels, api_key_id, api_key_secret):
     'Listen to live events from a feed'
     feed_name = feed
     assets = ','.join(assets).upper().split(',')
     currencies = ','.join(currencies).upper().split(',')
-    pairs = list(map('/'.join, product(assets, currencies)))
-    output_stream = state['output_stream']
-    listeners = state['listeners']
-    feeds = state['feeds']
-    # FIXME: each pair should get a separate stream which we should keep track
-    #        of in state['streams'].
-    if feed_name=='bitfinex':
-        # FIXME: Move the pairs handling into the Feed code
-        for pair in pairs:
-            pair = pair.replace('/', '')
-            feed = Feed.factory(feed_name, 
-                                output_stream=output_stream,
-                                raw_stream=raw_output,
-                                raw_interval=raw_interval)
-            feeds.append(feed)
-            listener = feed.listen(pair, channel)
-            listeners[f'{pair}-{feed_name}'] = listener
-    elif feed_name=='gdax':
-        if channel=='trades':
-            # FIXME: handle this mapping in a better way
-            channel = 'ticker'
-        for pair in pairs:
-            pair = pair.replace('/', '-')
-            feed = Feed.factory(feed_name,
-                                output_stream=output_stream,
-                                raw_stream=raw_output,
-                                raw_interval=raw_interval)
-            feeds.append(feed)
-            listener = feed.listen(pair, channel)
-            listeners[f'{pair}-{feed_name}'] = listener
-    elif feed_name=='luno':
-        if api_key_id is None:
-            api_key_id = (config['Luno'].get('api_key_id', '') if 'Luno' in
-                          config else '')
-            api_key_secret = (config['Luno'].get('api_key_secret', '') if
-                              'Luno' in config else '')
-        feed = Feed.factory(feed_name,
-                            output_stream=output_stream,
-                            raw_stream=raw_output,
-                            raw_interval=raw_interval,
-                            api_key_id=api_key_id,
-                            api_key_secret=api_key_secret)
-        feeds.append(feed)
-        for pair in pairs:
-            pair = pair.replace('/', '')
-            listener = feed.listen(pair)
-            listeners[f'{pair}-{feed_name}'] = listener
-    else:
-        raise NotImplementedError()
+    channels = ','.join(channels).lower().split(',')
+    feed = Feed.factory(feed_name) 
+    subscriptions = feed.subscribe(assets, currencies, channels)
+    state['subscriptions'].update(subscriptions)
 
 
 @coin.command()
@@ -238,21 +192,16 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
 @pass_state
 def collect(state, market, collector, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
-    subscriptions = {}
-    for feed in state['feeds']:
-        print(feed)
-        print(feed.subscriptions)
-        subscriptions.update(feed.subscriptions)
+    subscriptions = state['subscriptions']
     if market=='all':
-        print([sub.market_name for sub in subscriptions])
-        event_stream = union([sub.event_stream for sub in subscriptions])
+        all_streams = [sub.event_stream for sub in subscriptions.values()]
+        event_stream = union(*all_streams)
     else:
         event_stream = subscriptions[market].event_stream
     collector_name = collector
     collector = Collector.factory(collector_name, event_stream=event_stream,
                                   path=output, format=format, types=type,
                                   filters=filter, interval=interval)
-    # state['collectors'].append(collector)
 
 
 @coin.command()
@@ -265,10 +214,10 @@ def run(state, timeout):
     if not timeout:
         # Allow to run indefinitely if timeout==0
         timeout = None
-    listeners = state['listeners']
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
-    tasks = {name:asyncio.Task(sub) for name, sub in listeners.items()}
+    tasks = {name:asyncio.Task(sub.listener) for name, sub in
+             state['subscriptions'].items()}
     try:
         completed, pending = \
             loop.run_until_complete(asyncio.wait(tasks.values(), 

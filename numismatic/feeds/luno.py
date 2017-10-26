@@ -8,7 +8,10 @@ import websockets
 
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 from .base import Feed, RestClient, WebsocketClient
+from ..libs.config import get_config
 
+
+config = get_config()['Luno']
 
 logger = logging.getLogger(__name__)
 
@@ -54,26 +57,40 @@ class LunoWebsocketClient(WebsocketClient):
     '''Websocket client for the Luno Exchange
 
     '''
-    wss_url = 'wss://ws.luno.com/api/1/stream'
     exchange = 'Luno'
+    wss_url = 'wss://ws.luno.com/api/1/stream'
 
     api_key_id = attr.ib(default=None)
     api_key_secret = attr.ib(default=None, repr=False)
 
+    @api_key_id.validator
+    def __validate_api_key_id(self, attribute, value):
+        self.api_key_id = value if value else config.get('api_key_id', '')
 
-    async def _subscribe(self, symbol, channel=None, wss_url=None):
-        if wss_url is None:
-            wss_url = f'{self.wss_url}/{symbol}'
-        subscription = await super()._subscribe(symbol, channel, wss_url)
+    @api_key_secret.validator
+    def __validate_api_key_secret(self, attribute, value):
+        self.api_key_secret = value if value else \
+            config.get('api_key_secret', '')
+
+    async def _connect(self, subscription):
+        wss_url = f'{self.wss_url}/{subscription.symbol}'
+        logger.info(f'Connecting to {wss_url!r} ...')
+        self.websocket = await websockets.connect(wss_url)
+        if hasattr(self, 'on_connect'):
+            await self.on_connect(self.websocket)
+        return self.websocket
+
+    async def _subscribe(self, subscription):
+        await super()._subscribe(subscription)
         credentials = dict(api_key_id=self.api_key_id,
                            api_key_secret=self.api_key_secret)
         await self.websocket.send(json.dumps(credentials))
-        packet = await self.websocket.recv()
-        return subscription
+        subscription.handlers = [self._handle_order_book]
 
     @staticmethod
-    def handle_order_book(msg, subscription):
+    def _handle_order_book(msg, subscription):
         timestamp = time.time()
+        print(type(msg))
         if 'asks' in msg:
             sign = -1
             for order in msg['asks']:
@@ -97,9 +114,11 @@ class LunoWebsocketClient(WebsocketClient):
                                       volume=volume, id=id)
                 subscription.event_stream.emit(order_ev)
         if 'asks' in msg and 'bids' in msg:
-            raise StopIteration
+            # restore normal handlers
+            subscription.handlers = subscription.client._get_handlers()
 
-    def handle_trades(self, msg, subscription):
+    @staticmethod
+    def handle_trades(msg, subscription):
         # TODO: Implement handling of sequence numbers for detecting missing
         #       events
         timestamp = float(msg['timestamp'])/1000
@@ -109,7 +128,8 @@ class LunoWebsocketClient(WebsocketClient):
                 value = float(trade['counter'])
                 price = value/volume
                 id = trade['order_id']
-                trade_ev = Trade(exchange=subscription.exchange, symbol=symbol,
+                trade_ev = Trade(exchange=subscription.exchange,
+                                 symbol=subscription.symbol,
                                  timestamp=timestamp, price=price,
                                  volume=volume, id=id)
                 subscription.event_stream.emit(trade_ev)
@@ -127,7 +147,8 @@ class LunoWebsocketClient(WebsocketClient):
             volume = float(order['volume'])
             price = sign * float(order['price'])
             order_ev = LimitOrder(exchange=subscription.exchange,
-                                  symbol=symbol, timestamp=timestamp,
+                                  symbol=subscription.symbol, 
+                                  timestamp=timestamp,
                                   price=price, volume=volume, id=id)
             subscription.event_stream.emit(order_ev)
             # need to process further handlers so no StopIteration
@@ -141,7 +162,8 @@ class LunoWebsocketClient(WebsocketClient):
             delete_update = msg['delete_update']
             id = delete_update['order_id']
             cancel_ev = CancelOrder(exchange=subscription.exchange,
-                                    symbol=symbol, timestamp=timestamp, id=id)
+                                    symbol=subscription.symbol, 
+                                    timestamp=timestamp, id=id)
             subscription.event_stream.emit(cancel_ev)
             # need to process further handlers so no StopIteration
 

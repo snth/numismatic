@@ -20,6 +20,10 @@ class GDAXFeed(Feed):
         self.websocket_client = GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
                                           in attr.fields(GDAXWebsocketClient)
                                           if a.name in kwargs})
+        
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}-{currency}'
 
     def get_list(self):
         raise NotImplemented()
@@ -39,15 +43,17 @@ class GDAXWebsocketClient(WebsocketClient):
     This could probably be handled by having just one socket.
     '''
 
-    wss_url = 'wss://ws-feed.gdax.com'
     exchange = 'GDAX'
+    wss_url = 'wss://ws-feed.gdax.com'
 
-    async def _subscribe(self, symbol, channel, wss_url=None):
-        subscription = await super()._subscribe(symbol, channel, wss_url)
+    async def _subscribe(self, subscription):
+        await super()._subscribe(subscription)
         # install only the subscriptions handler
         subscription.handlers = [self.__handle_subscriptions]
-        msg = dict(type='subscribe', product_ids=symbol.split(','),
-                   channels=channel.split(','))
+        channels = ['ticker'] if subscription.channel=='trades' else \
+            [subscription.channel]
+        msg = dict(type='subscribe', product_ids=[subscription.symbol],
+                   channels=channels)
         packet = json.dumps(msg)
         logger.info(packet)
         await self.websocket.send(packet)
@@ -61,7 +67,7 @@ class GDAXWebsocketClient(WebsocketClient):
             logger.info(channel_info)
             subscription.channel_info.update(channel_info)
             # install the proper handlers
-            subscription.handlers = subscription.client.get_handlers()
+            subscription.handlers = subscription.client._get_handlers()
             # stop processing other handlers
             raise StopIteration
 
