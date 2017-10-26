@@ -65,6 +65,10 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
 
         coin listen -f bitfinex -f gdax collect run
+
+        coin listen -f bitfinex -f gdax collect --raw run
+
+        coin listen -f bitfinex -f gdax compare run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
