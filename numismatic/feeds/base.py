@@ -5,6 +5,7 @@ import abc
 from pathlib import Path
 import gzip
 from itertools import product
+from functools import partial
 import json
 
 from streamz import Stream
@@ -130,6 +131,8 @@ class WebsocketClient(abc.ABC):
                                     )
         # FIXME: find a better way to do this
         subscription.listener = self._listener(subscription)
+        subscription.raw_stream.sink(
+            partial(self.__handle_packet, subscription=subscription))
         return subscription
 
     async def _listener(self, subscription):
@@ -139,7 +142,7 @@ class WebsocketClient(abc.ABC):
         while True:
             try:
                 packet = await self.websocket.recv()
-                msg = self.__handle_packet(packet, subscription)
+                subscription.raw_stream.emit(packet)
             except asyncio.CancelledError:
                 ## unsubscribe
                 confirmation = \
@@ -172,9 +175,7 @@ class WebsocketClient(abc.ABC):
 
     @staticmethod
     def __handle_packet(packet, subscription):
-        # FIXME: the emit should be moved to the listener
-        # record the raw packets on the raw_stream
-        subscription.raw_stream.emit(packet)
+        # most of the time we get json so only decode that once
         try:
             msg = json.loads(packet)
         except:
@@ -182,8 +183,6 @@ class WebsocketClient(abc.ABC):
             raise
         if not msg:
             return
-        # FIXME: the code below should be moved to _handle_message
-        # most of the time we get json so only decode that once
         for handler in subscription.handlers:
             result = handler(msg, subscription)
             if result is STOP_HANDLERS:
