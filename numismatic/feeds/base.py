@@ -171,6 +171,7 @@ class WebsocketClient(abc.ABC):
 
     @staticmethod
     def __handle_packet(packet, subscription):
+        # FIXME: the emit should be moved to the listener
         # record the raw packets on the raw_stream
         subscription.raw_stream.emit(packet)
         try:

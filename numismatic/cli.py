@@ -179,6 +179,8 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
 
 @coin.command()
 @click.option('--market', '-m', default='all')
+@click.option('--event', 'stream', flag_value='event', default=True)
+@click.option('--raw', 'stream', flag_value='raw')
 @click.option('--collector', '-c', default='file', 
               type=click.Choice(Collector._get_subclasses().keys()))
 @click.option('--output', '-o', default='-', type=click.Path())
@@ -190,14 +192,21 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
 @click.option('--json', 'format', flag_value='json')
 @click.option('--interval', '-i', default=None, type=float)
 @pass_state
-def collect(state, market, collector, filter, type, output, format, interval):
+def collect(state, market, stream, collector, filter, type, output, format, interval):
     'Collect events and write them to an output sink'
     subscriptions = state['subscriptions']
+    if stream=='event':
+        stream_name = 'event_stream'
+    elif stream=='raw':
+        stream_name = 'raw_stream'
+    else:
+        raise ValueError(stream)
     if market=='all':
-        all_streams = [sub.event_stream for sub in subscriptions.values()]
+        all_streams = [getattr(sub, stream_name) for sub in
+                       subscriptions.values()]
         event_stream = union(*all_streams)
     else:
-        event_stream = subscriptions[market].event_stream
+        event_stream = getattr(subscriptions[market], stream_name)
     collector_name = collector
     collector = Collector.factory(collector_name, event_stream=event_stream,
                                   path=output, format=format, types=type,
