@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 LIBRARY_NAME = 'numismatic'
+STOP_HANDLERS = object()        # sentinel to signal end of handler processing
 
 
 @attr.s
@@ -184,4 +185,6 @@ class WebsocketClient(abc.ABC):
         # FIXME: the code below should be moved to _handle_message
         # most of the time we get json so only decode that once
         for handler in subscription.handlers:
-            handler(msg, subscription)
+            result = handler(msg, subscription)
+            if result is STOP_HANDLERS:
+                break

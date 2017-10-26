@@ -6,7 +6,7 @@ from streamz import Stream
 import attr
 import websockets
 
-from .base import Feed, WebsocketClient
+from .base import Feed, WebsocketClient, STOP_HANDLERS
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
@@ -64,16 +64,15 @@ class BitfinexWebsocketClient(WebsocketClient):
         if isinstance(msg, dict) and 'event' in msg and \
                 msg['event']=='subscribed':
             subscription.channel_info = msg
-            logger.info(channel_info)
+            logger.info(subscription.channel_info)
             # install the proper handlers
             subscription.handlers = subscription.client._get_handlers()
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
     async def _unsubscribe(self, subscription):
-        channel_info = subscription.channel_info
         msg = json.dumps(dict(event='unsubscribe', 
-                              chanId=channel_info['chanId']))
+                              chanId=subscription.channel_info['chanId']))
         logger.info(msg)
         await self.websocket.send(msg)
 
@@ -86,7 +85,7 @@ class BitfinexWebsocketClient(WebsocketClient):
             # disable all handlers
             subscription.handlers = []
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
     async def _ping_pong(self):
         'Simple ping pong for testing the connection'
@@ -99,11 +98,12 @@ class BitfinexWebsocketClient(WebsocketClient):
     @staticmethod
     def handle_heartbeat(msg, subscription):
         if isinstance(msg, list) and len(msg) in {2,3} and msg[1]=='hb':
-            msg = Heartbeat(exchange=subscription.exchange, symbol=symbol,
+            msg = Heartbeat(exchange=subscription.exchange,
+                            symbol=subscription.symbol,
                             timestamp=time.time())
             subscription.event_stream.emit(msg)
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
     @staticmethod
     def handle_trade(msg, subscription):
@@ -116,24 +116,26 @@ class BitfinexWebsocketClient(WebsocketClient):
                 logger.error(msg)
                 raise
             # FIXME: validate the channel_id below
-            msg = Trade(exchange=subscription.exchange, symbol=symbol, 
+            msg = Trade(exchange=subscription.exchange, 
+                        symbol=subscription.symbol, 
                         timestamp=timestamp/1000, price=price, volume=volume,
                         id=trade_id)
             subscription.event_stream.emit(msg)
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
     @staticmethod
     def handle_snapshot(msg, subscription):
         if isinstance(msg, list) and len(msg)==2 and isinstance(msg[1], list):
             # snapshot
             for (trade_id, timestamp, volume, price) in reversed(msg[1]):
-                msg = Trade(exchange=subscription.exchange, symbol=symbol, 
+                msg = Trade(exchange=subscription.exchange,
+                            symbol=subscription.symbol, 
                             timestamp=timestamp/1000, price=price, 
                             volume=volume, id=trade_id)
                 subscription.event_stream.emit(msg)
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
 
 if __name__=='__main__':

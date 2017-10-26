@@ -7,7 +7,7 @@ import attr
 import websockets
 
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
-from .base import Feed, RestClient, WebsocketClient
+from .base import Feed, RestClient, WebsocketClient, STOP_HANDLERS
 from ..libs.config import get_config
 
 
@@ -116,6 +116,7 @@ class LunoWebsocketClient(WebsocketClient):
         if 'asks' in msg and 'bids' in msg:
             # restore normal handlers
             subscription.handlers = subscription.client._get_handlers()
+            return STOP_HANDLERS
 
     @staticmethod
     def handle_trades(msg, subscription):
@@ -133,7 +134,7 @@ class LunoWebsocketClient(WebsocketClient):
                                  timestamp=timestamp, price=price,
                                  volume=volume, id=id)
                 subscription.event_stream.emit(trade_ev)
-            # need to process further handlers so no StopIteration
+            # need to process further handlers so no STOP_HANDLERS
 
     @staticmethod
     def handle_creates(msg, subscription):
@@ -151,7 +152,7 @@ class LunoWebsocketClient(WebsocketClient):
                                   timestamp=timestamp,
                                   price=price, volume=volume, id=id)
             subscription.event_stream.emit(order_ev)
-            # need to process further handlers so no StopIteration
+            # need to process further handlers so no STOP_HANDLERS
 
     @staticmethod
     def handle_deletes(msg, subscription):
@@ -165,7 +166,7 @@ class LunoWebsocketClient(WebsocketClient):
                                     symbol=subscription.symbol, 
                                     timestamp=timestamp, id=id)
             subscription.event_stream.emit(cancel_ev)
-            # need to process further handlers so no StopIteration
+            # need to process further handlers so no STOP_HANDLERS
 
 
 if __name__=='__main__':

@@ -175,6 +175,7 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
     feed = Feed.factory(feed_name) 
     subscriptions = feed.subscribe(assets, currencies, channels)
     state['subscriptions'].update(subscriptions)
+    print(state['subscriptions'].keys())
 
 
 @coin.command()
@@ -204,11 +205,11 @@ def collect(state, market, stream, collector, filter, type, output, format, inte
     if market=='all':
         all_streams = [getattr(sub, stream_name) for sub in
                        subscriptions.values()]
-        event_stream = union(*all_streams)
+        collect_stream = union(*all_streams)
     else:
-        event_stream = getattr(subscriptions[market], stream_name)
+        collect_stream = getattr(subscriptions[market], stream_name)
     collector_name = collector
-    collector = Collector.factory(collector_name, event_stream=event_stream,
+    collector = Collector.factory(collector_name, event_stream=collect_stream,
                                   path=output, format=format, types=type,
                                   filters=filter, interval=interval)
 

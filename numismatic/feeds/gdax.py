@@ -7,7 +7,7 @@ from streamz import Stream
 import attr
 import websockets
 
-from .base import Feed, WebsocketClient
+from .base import Feed, WebsocketClient, STOP_HANDLERS
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class GDAXWebsocketClient(WebsocketClient):
             # install the proper handlers
             subscription.handlers = subscription.client._get_handlers()
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
     async def _unsubscribe(self, subscription):
         channel_info = subscription.channel_info
@@ -94,7 +94,7 @@ class GDAXWebsocketClient(WebsocketClient):
                               symbol=subscription, timestamp=timestamp)
             subscription.event_stream.emit(event)
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
     @staticmethod
     def handle_trade(msg, subscription):
@@ -113,7 +113,7 @@ class GDAXWebsocketClient(WebsocketClient):
                         id=trade_id)
             subscription.event_stream.emit(msg)
             # stop processing other handlers
-            raise StopIteration
+            return STOP_HANDLERS
 
 
 if __name__=='__main__':
