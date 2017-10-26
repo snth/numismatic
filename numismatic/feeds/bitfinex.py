@@ -39,7 +39,7 @@ class BitfinexWebsocketClient(WebsocketClient):
     '''
 
     exchange = 'Bitfinex'
-    wss_url = 'wss://api.bitfinex.com/ws/2'
+    websocket_url = 'wss://api.bitfinex.com/ws/2'
 
     async def on_connect(self, ws):
         packet = await self.websocket.recv()

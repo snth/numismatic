@@ -111,10 +111,10 @@ class WebsocketClient(abc.ABC):
     '''Base class for WebsocketClient feeds'''
 
     exchange = None
-    wss_url = None
+    websocket_url = None
     websocket = attr.ib(default=None)
 
-    def listen(self, symbol, channel=None, wss_url=None):
+    def listen(self, symbol, channel=None, websocket_url=None):
         symbol = symbol.upper()
         # set up the subscription
         market_name = f'{self.exchange}--{symbol}--{channel}'
@@ -150,9 +150,9 @@ class WebsocketClient(abc.ABC):
                 raise
 
     async def _connect(self, subscription):
-        wss_url = subscription.client.wss_url
-        logger.info(f'Connecting to {wss_url!r} ...')
-        self.websocket = await websockets.connect(wss_url)
+        websocket_url = subscription.client.websocket_url
+        logger.info(f'Connecting to {websocket_url!r} ...')
+        self.websocket = await websockets.connect(websocket_url)
         if hasattr(self, 'on_connect'):
             await self.on_connect(self.websocket)
         return self.websocket

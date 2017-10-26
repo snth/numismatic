@@ -44,7 +44,7 @@ class GDAXWebsocketClient(WebsocketClient):
     '''
 
     exchange = 'GDAX'
-    wss_url = 'wss://ws-feed.gdax.com'
+    websocket_url = 'wss://ws-feed.gdax.com'
 
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)

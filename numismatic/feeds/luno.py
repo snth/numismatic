@@ -58,7 +58,7 @@ class LunoWebsocketClient(WebsocketClient):
 
     '''
     exchange = 'Luno'
-    wss_url = 'wss://ws.luno.com/api/1/stream'
+    websocket_url = 'wss://ws.luno.com/api/1/stream'
 
     api_key_id = attr.ib(default=None)
     api_key_secret = attr.ib(default=None, repr=False)
@@ -73,9 +73,9 @@ class LunoWebsocketClient(WebsocketClient):
             config.get('api_key_secret', '')
 
     async def _connect(self, subscription):
-        wss_url = f'{self.wss_url}/{subscription.symbol}'
-        logger.info(f'Connecting to {wss_url!r} ...')
-        self.websocket = await websockets.connect(wss_url)
+        websocket_url = f'{self.websocket_url}/{subscription.symbol}'
+        logger.info(f'Connecting to {websocket_url!r} ...')
+        self.websocket = await websockets.connect(websocket_url)
         if hasattr(self, 'on_connect'):
             await self.on_connect(self.websocket)
         return self.websocket
