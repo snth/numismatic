@@ -20,12 +20,12 @@ class Heartbeat(Event):
 
 @attr.s(slots=True)
 class Trade(Event):
-    exchange = attr.ib()
-    symbol = attr.ib()
-    timestamp = attr.ib()
-    price = attr.ib()
-    volume = attr.ib()
-    id = attr.ib(default=None)
+    exchange = attr.ib(convert=str)
+    symbol = attr.ib(convert=str)
+    timestamp = attr.ib(convert=float)
+    price = attr.ib(convert=float)
+    volume = attr.ib(convert=float)
+    id = attr.ib(default=None, convert=str)
 
 @attr.s(slots=True)
 class LimitOrder(Event):
