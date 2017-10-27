@@ -8,7 +8,7 @@ import attr
 import websockets
 
 from .base import Feed, WebsocketClient, STOP_HANDLERS
-from ..events import Heartbeat, Trade, LimitOrder, CancelOrder
+from ..events import Heartbeat, Trade
 
 logger = logging.getLogger(__name__)
 
@@ -104,13 +104,14 @@ class GDAXWebsocketClient(WebsocketClient):
             if 'time' in msg:
                 dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
                 timestamp = dt.timestamp()
-            sign = -1 if ('side' in msg and msg['side']=='sell') else 1
-            price = msg['price']
-            volume = sign * msg['last_size'] if 'last_size' in msg else 0
-            trade_id = msg['trade_id']
-            msg = Trade(exchange=subscription.exchange, symbol=symbol, 
-                        timestamp=timestamp, price=price, volume=volume,
-                        id=trade_id)
+            msg = Trade(exchange=subscription.exchange,
+                        symbol=symbol, 
+                        price=msg['price'],
+                        volume=msg['last_size'] if 'last_size' in msg else 0,
+                        type=msg['side'].upper(),
+                        timestamp=timestamp,
+                        id=msg['trade_id'],
+                        )
             subscription.event_stream.emit(msg)
             # stop processing other handlers
             return STOP_HANDLERS

@@ -5,7 +5,7 @@ from functools import partial
 import attr
 
 from .base import Collector
-from ..events import Trade
+from ..events import OrderType, Trade
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ except ImportError:
 
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, \
     Float, String
-TYPE_MAPPING = {int:Integer, float:Float, str:String}
+TYPE_MAPPING = {int:Integer, float:Float, str:String, OrderType:String}
 
 
 @attr.s
