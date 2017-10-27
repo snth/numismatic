@@ -5,7 +5,7 @@ from functools import partial
 import attr
 
 from .base import Collector
-from ..events import OrderType, Trade
+from ..events import OrderType, Trade, Order
 
 logger = logging.getLogger(__name__)
 
@@ -35,28 +35,45 @@ class SqlCollector(Collector):
         engine = create_engine(self.path, echo=False)
 
         metadata = MetaData()
-        columns = [Column(attribute.name, TYPE_MAPPING[attribute.convert]) 
-                   for attribute in attr.fields(Trade)]
-        trades = Table('trades', metadata, *columns)
 
-        # create tables where required
+        self._store_events_of_type(Trade, engine, metadata)
+        self._store_events_of_type(Order, engine, metadata)
+
+    @staticmethod
+    def _make_table_from_attrs(attrs_cls, table_name=None, metadata=None):
+        metadata = MetaData() if metadata is None else metadata
+        columns = [Column(attribute.name, TYPE_MAPPING[attribute.convert]) 
+                   for attribute in attr.fields(attrs_cls)]
+        table_name = table_name if table_name else (
+            attrs_cls.__name__.lower() + 's')
+        table_obj = Table(table_name, metadata, *columns)
+        return table_obj
+
+    def _store_events_of_type(self, event_type, engine, metadata):
+        # filter events of the type
+        event_type_stream = \
+            self.event_stream.filter(lambda ev: isinstance(ev, event_type))
+
+        # construct data_stream
+        json_stream = event_type_stream.map(attr.asdict)
+
+        if self.interval:
+            data_stream = json_stream.timed_window(interval=self.interval)
+        else:
+            # ensure downstream receives lists rather than elements
+            data_stream = json_stream.partition(1)
+
+        # create the necessary tables
+        events_table = \
+            self._make_table_from_attrs(event_type, metadata=metadata)
         metadata.create_all(engine)
 
         # prepare the insert statement
-        trades_insert = trades.insert()
+        events_table_insert = events_table.insert()
         # trades_insert.bind = engine
-
-        # construct data_stream
-        self._json_stream = self.event_stream.map(attr.asdict)
-        if self.interval:
-            self._data_stream = \
-                self._json_stream.timed_window(interval=self.interval)
-        else:
-            # ensure downstream receives lists rather than elements
-            self._data_stream = \
-                self._json_stream.partition(1)
 
         # sink to the database
         conn = engine.connect()
-        self._data_stream.filter(len).sink(
-            partial(conn.execute, trades_insert))
+        data_stream.filter(len).sink(
+            partial(conn.execute, events_table_insert))
+
