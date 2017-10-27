@@ -1,6 +1,5 @@
 from itertools import product
 import logging
-import asyncio
 import json
 import time
 
@@ -8,8 +7,11 @@ import attr
 import websockets
 
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
-from .base import Feed, RestClient, WebsocketClient
+from .base import Feed, RestClient, WebsocketClient, STOP_HANDLERS
+from ..libs.config import get_config
 
+
+config = get_config()['Luno']
 
 logger = logging.getLogger(__name__)
 
@@ -55,76 +57,69 @@ class LunoWebsocketClient(WebsocketClient):
     '''Websocket client for the Luno Exchange
 
     '''
-    wss_url = 'wss://ws.luno.com/api/1/stream'
     exchange = 'Luno'
+    websocket_url = 'wss://ws.luno.com/api/1/stream'
 
     api_key_id = attr.ib(default=None)
     api_key_secret = attr.ib(default=None, repr=False)
 
+    @api_key_id.validator
+    def __validate_api_key_id(self, attribute, value):
+        self.api_key_id = value if value else config.get('api_key_id', '')
 
-    async def listen(self, symbol):
-        symbol = symbol.upper()
-        await super().listen(symbol)
-        ws = await self._subscribe(symbol)
-        while True:
-            try:
-                packet = await ws.recv()
-                msg = self._handle_packet(packet, symbol)
-            except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = await self._unsubscribe(ws, symbol)
-            except Exception as ex:
-                logger.error(ex)
-                logger.error(packet)
-                raise
+    @api_key_secret.validator
+    def __validate_api_key_secret(self, attribute, value):
+        self.api_key_secret = value if value else \
+            config.get('api_key_secret', '')
 
-    async def _subscribe(self, symbol):
-        wss_url = f'{self.wss_url}/{symbol}'
-        logger.info(f'Connecting to {wss_url} ...')
-        ws = await websockets.connect(wss_url)
+    async def _connect(self, subscription):
+        websocket_url = f'{self.websocket_url}/{subscription.symbol}'
+        logger.info(f'Connecting to {websocket_url!r} ...')
+        self.websocket = await websockets.connect(websocket_url)
+        if hasattr(self, 'on_connect'):
+            await self.on_connect(self.websocket)
+        return self.websocket
+
+    async def _subscribe(self, subscription):
+        await super()._subscribe(subscription)
         credentials = dict(api_key_id=self.api_key_id,
                            api_key_secret=self.api_key_secret)
-        await ws.send(json.dumps(credentials))
-        packet = await ws.recv()
-        self._handle_order_book(packet, symbol)
-        return ws
+        await self.websocket.send(json.dumps(credentials))
+        subscription.handlers = [self._handle_order_book]
 
-    @classmethod
-    async def _unsubscribe(cls, ws, symbol):
-        return True
-
-    def _handle_order_book(self, packet, symbol):
+    @staticmethod
+    def _handle_order_book(msg, subscription):
         timestamp = time.time()
-        super()._handle_packet(packet, symbol)
-        order_book = json.loads(packet)
-        if 'asks' in order_book:
+        print(type(msg))
+        if 'asks' in msg:
             sign = -1
-            for order in order_book['asks']:
+            for order in msg['asks']:
                 id = order['id']
                 volume = float(order['volume'])
                 price = sign * float(order['price'])
-                order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
-                                    timestamp=timestamp, price=price,
-                                    volume=volume, id=id)
-                self.output_stream.emit(order_ev)
-        if 'bids' in order_book:
+                order_ev = LimitOrder(exchange=subscription.exchange,
+                                      symbol=subscription.symbol,
+                                      timestamp=timestamp, price=price,
+                                      volume=volume, id=id)
+                subscription.event_stream.emit(order_ev)
+        if 'bids' in msg:
             sign = 1
-            for order in order_book['bids']:
+            for order in msg['bids']:
                 id = order['id']
                 volume = float(order['volume'])
                 price = sign * float(order['price'])
-                order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
-                                    timestamp=timestamp, price=price,
-                                    volume=volume, id=id)
-                self.output_stream.emit(order_ev)
-        return order_book
+                order_ev = LimitOrder(exchange=subscription.exchange,
+                                      symbol=subscription.symbol,
+                                      timestamp=timestamp, price=price,
+                                      volume=volume, id=id)
+                subscription.event_stream.emit(order_ev)
+        if 'asks' in msg and 'bids' in msg:
+            # restore normal handlers
+            subscription.handlers = subscription.client._get_handlers()
+            return STOP_HANDLERS
 
-    def _handle_packet(self, packet, symbol):
-        super()._handle_packet(packet, symbol)
-        msg = json.loads(packet)
-        if not msg:
-            # sometimes we receive empty packets
-            return msg
+    @staticmethod
+    def handle_trades(msg, subscription):
         # TODO: Implement handling of sequence numbers for detecting missing
         #       events
         timestamp = float(msg['timestamp'])/1000
@@ -134,27 +129,44 @@ class LunoWebsocketClient(WebsocketClient):
                 value = float(trade['counter'])
                 price = value/volume
                 id = trade['order_id']
-                trade_ev = Trade(exchange=self.exchange, symbol=symbol,
+                trade_ev = Trade(exchange=subscription.exchange,
+                                 symbol=subscription.symbol,
                                  timestamp=timestamp, price=price,
                                  volume=volume, id=id)
-                self.output_stream.emit(trade_ev)
+                subscription.event_stream.emit(trade_ev)
+            # need to process further handlers so no STOP_HANDLERS
+
+    @staticmethod
+    def handle_creates(msg, subscription):
+        # TODO: Implement handling of sequence numbers for detecting missing
+        #       events
+        timestamp = float(msg['timestamp'])/1000
         if 'create_update' in msg and msg['create_update']:
             order = msg['create_update']
             sign = 1 if order['type']=='BID' else -1
             id = order['order_id']
             volume = float(order['volume'])
             price = sign * float(order['price'])
-            order_ev = LimitOrder(exchange=self.exchange, symbol=symbol,
-                                  timestamp=timestamp, price=price,
-                                  volume=volume, id=id)
-            self.output_stream.emit(order_ev)
+            order_ev = LimitOrder(exchange=subscription.exchange,
+                                  symbol=subscription.symbol, 
+                                  timestamp=timestamp,
+                                  price=price, volume=volume, id=id)
+            subscription.event_stream.emit(order_ev)
+            # need to process further handlers so no STOP_HANDLERS
+
+    @staticmethod
+    def handle_deletes(msg, subscription):
+        # TODO: Implement handling of sequence numbers for detecting missing
+        #       events
+        timestamp = float(msg['timestamp'])/1000
         if 'delete_update' in msg and msg['delete_update']:
             delete_update = msg['delete_update']
             id = delete_update['order_id']
-            cancel_ev = CancelOrder(exchange=self.exchange, symbol=symbol,
+            cancel_ev = CancelOrder(exchange=subscription.exchange,
+                                    symbol=subscription.symbol, 
                                     timestamp=timestamp, id=id)
-            self.output_stream.emit(cancel_ev)
-        return msg
+            subscription.event_stream.emit(cancel_ev)
+            # need to process further handlers so no STOP_HANDLERS
 
 
 if __name__=='__main__':
@@ -162,6 +174,7 @@ if __name__=='__main__':
     # Test with: python -m numismatic.exchanges.luno
     from configparser import ConfigParser
     from pathlib import Path
+    import asyncio
     from streamz import Stream
     logging.basicConfig(level=logging.INFO)
     config = ConfigParser()

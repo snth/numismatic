@@ -1,5 +1,4 @@
 import logging
-import asyncio
 import json
 import time
 from datetime import datetime
@@ -8,7 +7,7 @@ from streamz import Stream
 import attr
 import websockets
 
-from .base import Feed, WebsocketClient
+from .base import Feed, WebsocketClient, STOP_HANDLERS
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
@@ -21,6 +20,10 @@ class GDAXFeed(Feed):
         self.websocket_client = GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
                                           in attr.fields(GDAXWebsocketClient)
                                           if a.name in kwargs})
+        
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}-{currency}'
 
     def get_list(self):
         raise NotImplemented()
@@ -40,49 +43,36 @@ class GDAXWebsocketClient(WebsocketClient):
     This could probably be handled by having just one socket.
     '''
 
-    wss_url = 'wss://ws-feed.gdax.com'
     exchange = 'GDAX'
+    websocket_url = 'wss://ws-feed.gdax.com'
 
-
-    @classmethod
-    async def _connect(cls):
-        logger.info(f'Connecting to {cls.wss_url!r} ...')
-        ws = await websockets.connect(cls.wss_url)
-        # packet = await ws.recv()
-        # connection_status = json.loads(packet)
-        # logger.info(connection_status)
-        return ws
-
-
-    async def listen(self, symbol, channel='ticker'):
-        ws = await self._connect()
-        await super().listen(symbol)
-        channel_info = await self._subscribe(ws, symbol,  channel)
-        while True:
-            try:
-                packet = await ws.recv()
-                msg = self._handle_packet(packet, symbol)
-            except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = await self._unsubscribe(ws, channel_info)
-
-    async def _subscribe(self, ws, symbol, channel):
-        msg = dict(type='subscribe', product_ids=symbol.split(','),
-                   channels=channel.split(','))
+    async def _subscribe(self, subscription):
+        await super()._subscribe(subscription)
+        # install only the subscriptions handler
+        subscription.handlers = [self.__handle_subscriptions]
+        channels = ['ticker'] if subscription.channel=='trades' else \
+            [subscription.channel]
+        msg = dict(type='subscribe', product_ids=[subscription.symbol],
+                   channels=channels)
         packet = json.dumps(msg)
         logger.info(packet)
-        await ws.send(packet)
-        while True:
-            packet = await ws.recv()
-            msg = self._handle_packet(packet, symbol)
-            if isinstance(msg, dict) and 'type' in msg and \
-                    msg['type']=='subscriptions':
-                channel_info = msg
-                logger.info(channel_info)
-                break
-        return channel_info 
+        await self.websocket.send(packet)
+        return subscription
 
-    async def _unsubscribe(self, ws, channel_info):
+    @staticmethod
+    def __handle_subscriptions(msg, subscription):
+        if isinstance(msg, dict) and 'type' in msg and \
+                msg['type']=='subscriptions':
+            channel_info = msg
+            logger.info(channel_info)
+            subscription.channel_info.update(channel_info)
+            # install the proper handlers
+            subscription.handlers = subscription.client._get_handlers()
+            # stop processing other handlers
+            return STOP_HANDLERS
+
+    async def _unsubscribe(self, subscription):
+        channel_info = subscription.channel_info
         symbols = {symbol for channel in channel_info['channels'] 
                    for symbol in channel['product_ids']}
         channels = [channel['name'] for channel in channel_info['channels']]
@@ -90,48 +80,47 @@ class GDAXWebsocketClient(WebsocketClient):
                    channels=channels)
         packet = json.dumps(msg)
         logger.info(msg)
-        await ws.send(msg)
+        await self.websocket.send(msg)
         while True:
-            packet = await ws.recv()
-            msg = self._handle_packet(packet, 'N/A')
+            packet = await self.websocket.recv()
+            msg = self._handle_packet(packet, subscription)
             break
         return msg
 
-    def _handle_packet(self, packet, symbol):
-        super()._handle_packet(packet, symbol)
-        msg = json.loads(packet)
-        if not isinstance(msg, dict):
-            raise TypeError('msg: {msg}'.format(msg=msg))
-        if 'product_id' in msg:
-            symbol = msg['product_id'].replace('-', '')
-        if 'time' in msg:
-            dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            timestamp = dt.timestamp()
-
+    @staticmethod
+    def handle_heartbeat(msg, subscription):
         if 'type' in msg and msg['type']=='heartbeat':
-            msg = Heartbeat(exchange=self.exchange, symbol=symbol,
-                            timestamp=timestamp)
-            self.output_stream.emit(msg)
-        elif 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
+            event = Heartbeat(exchange=subscription.exchange, 
+                              symbol=subscription, timestamp=timestamp)
+            subscription.event_stream.emit(event)
+            # stop processing other handlers
+            return STOP_HANDLERS
+
+    @staticmethod
+    def handle_trade(msg, subscription):
+        if 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
+            if 'product_id' in msg:
+                symbol = msg['product_id'].replace('-', '')
+            if 'time' in msg:
+                dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                timestamp = dt.timestamp()
             sign = -1 if ('side' in msg and msg['side']=='sell') else 1
             price = msg['price']
             volume = sign * msg['last_size'] if 'last_size' in msg else 0
             trade_id = msg['trade_id']
-            msg = Trade(exchange=self.exchange, symbol=symbol, 
+            msg = Trade(exchange=subscription.exchange, symbol=symbol, 
                         timestamp=timestamp, price=price, volume=volume,
                         id=trade_id)
-            self.output_stream.emit(msg)
-        elif isinstance(msg, dict):
-            self.output_stream.emit(msg)
-        else:
-            raise NotImplementedError(msg)
-        return msg
+            subscription.event_stream.emit(msg)
+            # stop processing other handlers
+            return STOP_HANDLERS
 
 
 if __name__=='__main__':
     # Simple example of how these should be used
     # Test with: python -m numismatic.exchanges.bitfinex
     logging.basicConfig(level=logging.INFO)
+    import asyncio
     from streamz import Stream
     output_stream = Stream()
     printer = output_stream.map(print)

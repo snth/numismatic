@@ -1,11 +1,16 @@
 import logging
 import time
+import asyncio
 import abc
 from pathlib import Path
 import gzip
+from itertools import product
+from functools import partial
+import json
 
 from streamz import Stream
 import attr
+import websockets
 
 from ..libs.requesters import Requester
 
@@ -13,6 +18,21 @@ logger = logging.getLogger(__name__)
 
 
 LIBRARY_NAME = 'numismatic'
+STOP_HANDLERS = object()        # sentinel to signal end of handler processing
+
+
+@attr.s
+class Subscription:
+    market_name = attr.ib()
+    exchange = attr.ib()
+    symbol = attr.ib()
+    channel = attr.ib()
+    client = attr.ib()
+    listener = attr.ib()
+    channel_info = attr.ib(default=attr.Factory(dict))
+    raw_stream = attr.ib(default=attr.Factory(Stream))
+    event_stream = attr.ib(default=attr.Factory(Stream))
+    handlers = attr.ib(default=attr.Factory(list))
 
 
 @attr.s
@@ -22,6 +42,10 @@ class Feed(abc.ABC):
     rest_client = attr.ib(default=None)
     websocket_client = attr.ib(default=None)
         
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}{currency}'
+
     @abc.abstractmethod
     def get_list(self):
         return
@@ -34,6 +58,21 @@ class Feed(abc.ABC):
     def get_prices(self, assets, currencies):
         return
 
+    def subscribe(self, assets, currencies, channels):
+        assets = ','.join(assets).split(',')
+        currencies = ','.join(currencies).split(',')
+        channels = ','.join(channels).split(',')
+        subscriptions = {}
+        for symbol, channel in product(self._get_pairs(assets, currencies),
+                                       channels):
+            if self.websocket_client is not None:
+                subscription = self.websocket_client.listen(symbol, channel)
+            else:
+                raise NotImplementedError
+            subscriptions[subscription.market_name] = subscription
+        return subscriptions
+
+
     def __getattr__(self, attr):
         if self.rest_client is not None and hasattr(self.rest_client, attr):
             return getattr(self.rest_client, attr)
@@ -41,6 +80,11 @@ class Feed(abc.ABC):
             return getattr(self.websocket_client, attr)
         else:
             raise AttributeError
+
+    @classmethod
+    def _get_pairs(cls, assets, currencies):
+        for asset, currency in product(assets, currencies):
+            yield cls.get_symbol(asset, currency)
 
 
 @attr.s
@@ -66,39 +110,80 @@ class RestClient(abc.ABC):
 @attr.s
 class WebsocketClient(abc.ABC):
     '''Base class for WebsocketClient feeds'''
-    # TODO: Write to a separate stream
-    output_stream = attr.ib(default=None)
-    raw_stream = attr.ib(default=None)
-    raw_interval = attr.ib(default=1)
 
-    @abc.abstractmethod
-    async def listen(self, symbol):
-        if self.raw_stream is not None:
-            # FIXME: Use a FileCollector here
-            if self.raw_stream=='':
-                from appdirs import user_cache_dir
-                self.raw_stream = user_cache_dir(LIBRARY_NAME)
-            date = time.strftime('%Y%m%dT%H%M%S')
-            filename = f'{self.exchange}_{symbol}_{date}.json.gz'
-            raw_stream_path = str(Path(self.raw_stream) / filename)
-            logger.info(f'Writing raw stream to {raw_stream_path} ...')
+    exchange = None
+    websocket_url = None
+    websocket = attr.ib(default=None)
 
-            def write_to_file(batch):
-                logger.debug(f'Writing batch of {len(batch)} for {symbol} ...')
-                with gzip.open(raw_stream_path, 'at') as f:
-                    for packet in batch:
-                        f.write(packet+'\n')
+    def listen(self, symbol, channel=None, websocket_url=None):
+        symbol = symbol.upper()
+        # set up the subscription
+        market_name = f'{self.exchange}--{symbol}--{channel}'
+        channel_info = {'channel': channel}
+        subscription = Subscription(market_name=market_name,
+                                    exchange=self.exchange, 
+                                    symbol=symbol,
+                                    channel=channel,
+                                    channel_info=channel_info, 
+                                    client=self,
+                                    listener=None,
+                                    handlers=self._get_handlers(),
+                                    )
+        # FIXME: find a better way to do this
+        subscription.listener = self._listener(subscription)
+        subscription.raw_stream.sink(
+            partial(self.__handle_packet, subscription=subscription))
+        return subscription
 
-            self.raw_stream = Stream()
-            (self.raw_stream
-             .timed_window(self.raw_interval)
-             .filter(len)
-             .sink(write_to_file)
-             )
+    async def _listener(self, subscription):
+        if self.websocket is None:
+            self.websocket = await self._connect(subscription)
+        await self._subscribe(subscription)
+        while True:
+            try:
+                packet = await self.websocket.recv()
+                subscription.raw_stream.emit(packet)
+            except asyncio.CancelledError:
+                ## unsubscribe
+                confirmation = \
+                    await asyncio.shield(self._unsubscribe(subscription))
+            except Exception as ex:
+                logger.error(ex)
+                logger.error(packet)
+                raise
+
+    async def _connect(self, subscription):
+        websocket_url = subscription.client.websocket_url
+        logger.info(f'Connecting to {websocket_url!r} ...')
+        self.websocket = await websockets.connect(websocket_url)
+        if hasattr(self, 'on_connect'):
+            await self.on_connect(self.websocket)
+        return self.websocket
+
+    async def _subscribe(self, subscription):
+        pass
+
+    async def _unsubscribe(self, subscription):
+        pass
+
+    @classmethod
+    def _get_handlers(cls):
+        return [getattr(cls, attr) for attr in dir(cls)
+                if callable(getattr(cls, attr)) 
+                and attr.startswith('handle_')]
              
 
-    @abc.abstractmethod
-    def _handle_packet(self, packet, symbol):
-        # record the raw packets on the raw_stream
-        if self.raw_stream is not None:
-            self.raw_stream.emit(packet)
+    @staticmethod
+    def __handle_packet(packet, subscription):
+        # most of the time we get json so only decode that once
+        try:
+            msg = json.loads(packet)
+        except:
+            msg = packet
+            raise
+        if not msg:
+            return
+        for handler in subscription.handlers:
+            result = handler(msg, subscription)
+            if result is STOP_HANDLERS:
+                break

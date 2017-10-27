@@ -1,13 +1,12 @@
 import logging
-import asyncio
-import json
 import time
+import json
 
 from streamz import Stream
 import attr
 import websockets
 
-from .base import Feed, WebsocketClient
+from .base import Feed, WebsocketClient, STOP_HANDLERS
 from ..libs.events import Heartbeat, Trade, LimitOrder, CancelOrder
 
 logger = logging.getLogger(__name__)
@@ -39,110 +38,111 @@ class BitfinexWebsocketClient(WebsocketClient):
     This could probably be handled by having just one socket.
     '''
 
-    wss_url = 'wss://api.bitfinex.com/ws/2'
     exchange = 'Bitfinex'
+    websocket_url = 'wss://api.bitfinex.com/ws/2'
 
-
-    @classmethod
-    async def _connect(cls):
-        logger.info(f'Connecting to {cls.wss_url!r} ...')
-        ws = await websockets.connect(cls.wss_url)
-        packet = await ws.recv()
+    async def on_connect(self, ws):
+        packet = await self.websocket.recv()
         connection_status = json.loads(packet)
         logger.info(connection_status)
         return ws
 
-    async def listen(self, symbol, channel='trades'):
-        ws = await self._connect()
-        await super().listen(symbol)
-        channel_info = await self._subscribe(ws, symbol,  channel)
-        while True:
-            try:
-                packet = await ws.recv()
-                msg = self._handle_packet(packet, symbol)
-            except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = \
-                    await asyncio.shield(self._unsubscribe(ws, channel_info))
-
-    async def _subscribe(self, ws, symbol, channel):
-        msg = json.dumps(dict(event='subscribe', channel=channel,
-                                symbol=symbol))
+    async def _subscribe(self, subscription):
+        await super()._subscribe(subscription)
+        # install only the handle_subscribed handler
+        # it needs to go through the main __handle_packet so the raw_stream is
+        # updated.
+        subscription.handlers = [self.__handle_subscribed]
+        msg = json.dumps(dict(event='subscribe', channel=subscription.channel, 
+                              symbol=subscription.symbol))
         logger.info(msg)
-        await ws.send(msg)
-        while True:
-            packet = await ws.recv()
-            msg = self._handle_packet(packet, symbol)
-            if isinstance(msg, dict) and 'event' in msg and \
-                    msg['event']=='subscribed':
-                channel_info = msg
-                logger.info(channel_info)
-                break
-        return channel_info 
-
-    async def _unsubscribe(self, ws, channel_info):
-        msg = json.dumps(dict(event='unsubscribe', chanId=channel_info['chanId']))
-        logger.info(msg)
-        await ws.send(msg)
-        while True:
-            packet = await ws.recv()
-            msg = self._handle_packet(packet, channel_info['pair'])
-            if isinstance(msg, dict) and 'event' in msg and \
-                    msg['event']=='unsubscribed':
-                confirmation = msg
-                logger.info(confirmation)
-                break
-        return confirmation
-
-    def _handle_packet(self, packet, symbol):
-        super()._handle_packet(packet, symbol)
-        msg = json.loads(packet)
-        if isinstance(msg, dict) and 'event' in msg:
-            pass
-        elif isinstance(msg, list):
-            if len(msg) in {2,3} and msg[1]=='hb':
-                msg = Heartbeat(exchange=self.exchange, symbol=symbol,
-                                timestamp=time.time())
-                self.output_stream.emit(msg)
-            elif len(msg)==3:
-                try:
-                    channel_id, trade_type, (trade_id, timestamp, volume, price) = msg
-                except TypeError as e:
-                    logger.error(e)
-                    logger.error(msg)
-                    raise
-                # FIXME: validate the channel_id below
-                msg = Trade(exchange=self.exchange, symbol=symbol, 
-                            timestamp=timestamp/1000, price=price, volume=volume,
-                            id=trade_id)
-                self.output_stream.emit(msg)
-            elif len(msg)==2 and isinstance(msg[1], list):
-                # snapshot
-                for (trade_id, timestamp, volume, price) in reversed(msg[1]):
-                    msg = Trade(exchange=self.exchange, symbol=symbol, 
-                                timestamp=timestamp/1000, price=price, 
-                                volume=volume, id=trade_id)
-                    self.output_stream.emit(msg)
-            else:
-                msg = None
-        else:
-            raise NotImplementedError(msg)
-        return msg
+        await self.websocket.send(msg)
+        return subscription
 
     @staticmethod
-    async def _ping_pong(ws):
+    def __handle_subscribed(msg, subscription):
+        if isinstance(msg, dict) and 'event' in msg and \
+                msg['event']=='subscribed':
+            subscription.channel_info = msg
+            logger.info(subscription.channel_info)
+            # install the proper handlers
+            subscription.handlers = subscription.client._get_handlers()
+            # stop processing other handlers
+            return STOP_HANDLERS
+
+    async def _unsubscribe(self, subscription):
+        msg = json.dumps(dict(event='unsubscribe', 
+                              chanId=subscription.channel_info['chanId']))
+        logger.info(msg)
+        await self.websocket.send(msg)
+
+    @staticmethod
+    def __handle_unsubscribed(msg, subscription):
+        if isinstance(msg, dict) and 'event' in msg and \
+                msg['event']=='unsubscribed':
+            confirmation = msg
+            logger.info(confirmation)
+            # disable all handlers
+            subscription.handlers = []
+            # stop processing other handlers
+            return STOP_HANDLERS
+
+    async def _ping_pong(self):
         'Simple ping pong for testing the connection'
         # try ping-pong
         msg = json.dumps({'event':'ping'})
-        await ws.send(msg)
-        pong = await ws.recv()
+        await self.websocket.send(msg)
+        pong = await self.websocket.recv()
         return pong
+
+    @staticmethod
+    def handle_heartbeat(msg, subscription):
+        if isinstance(msg, list) and len(msg) in {2,3} and msg[1]=='hb':
+            msg = Heartbeat(exchange=subscription.exchange,
+                            symbol=subscription.symbol,
+                            timestamp=time.time())
+            subscription.event_stream.emit(msg)
+            # stop processing other handlers
+            return STOP_HANDLERS
+
+    @staticmethod
+    def handle_trade(msg, subscription):
+        if isinstance(msg, list) and len(msg)==3:
+            try:
+                channel_id, trade_type, (trade_id, timestamp, volume, price) = msg
+            except TypeError as e:
+                # for debugging
+                logger.error(e)
+                logger.error(msg)
+                raise
+            # FIXME: validate the channel_id below
+            msg = Trade(exchange=subscription.exchange, 
+                        symbol=subscription.symbol, 
+                        timestamp=timestamp/1000, price=price, volume=volume,
+                        id=trade_id)
+            subscription.event_stream.emit(msg)
+            # stop processing other handlers
+            return STOP_HANDLERS
+
+    @staticmethod
+    def handle_snapshot(msg, subscription):
+        if isinstance(msg, list) and len(msg)==2 and isinstance(msg[1], list):
+            # snapshot
+            for (trade_id, timestamp, volume, price) in reversed(msg[1]):
+                msg = Trade(exchange=subscription.exchange,
+                            symbol=subscription.symbol, 
+                            timestamp=timestamp/1000, price=price, 
+                            volume=volume, id=trade_id)
+                subscription.event_stream.emit(msg)
+            # stop processing other handlers
+            return STOP_HANDLERS
 
 
 if __name__=='__main__':
     # Simple example of how these should be used
     # Test with: python -m numismatic.feeds.bitfinex
     logging.basicConfig(level=logging.INFO)
+    import asyncio
     from streamz import Stream
     output_stream = Stream()
     printer = output_stream.map(print)
