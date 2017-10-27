@@ -1,10 +1,11 @@
 import logging
 
 from .base import Feed, RestClient
-from ..libs.config import get_config
+from ..config import config
 
 
 logger = logging.getLogger(__name__)
+config = config['BraveNewCoin']
 
 
 class BraveNewCoinFeed(Feed):
@@ -48,13 +49,12 @@ class BraveNewCoinRestClient(RestClient):
         # Should the requester and cache_dir not also be settable in config?
         super().__init__(requester=requester, cache_dir=cache_dir)
         
-        config = get_config('bravenewcoin')
-        if api_key_secret is None:
-            api_key_secret = config.get('api_key_secret', None)
-        
         if api_key_id is None:
             # X-Mashape-Key is the default id
             api_key_id = config.get('api_key_id', 'X-Mashape-Key')
+        
+        if api_key_secret is None:
+            api_key_secret = config['api_key_secret']
 
         assert api_key_secret, api_key_id
         self.headers = {api_key_id: api_key_secret}

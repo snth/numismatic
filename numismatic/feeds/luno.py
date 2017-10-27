@@ -8,12 +8,11 @@ import websockets
 
 from ..events import Heartbeat, Trade, Order
 from .base import Feed, RestClient, WebsocketClient, STOP_HANDLERS
-from ..libs.config import get_config
+from ..config import config
 
-
-config = get_config()['Luno']
 
 logger = logging.getLogger(__name__)
+config = config['Luno']
 
 
 class LunoFeed(Feed):

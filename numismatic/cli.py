@@ -11,18 +11,15 @@ import attr
 from .events import Trade
 from .collectors import Collector
 from .feeds import Feed
-from .libs.config import get_config
+from .config import config
 
 logger = logging.getLogger(__name__)
 
 AsyncIOMainLoop().install()
 
 
-config = get_config()
-
-
-DEFAULT_ASSETS = ['BTC']
-DEFAULT_CURRENCIES = ['USD']
+DEFAULT_ASSETS = config['DEFAULT']['assets'].split(',')
+DEFAULT_CURRENCIES = config['DEFAULT']['currencies'].split(',')
 ENVVAR_PREFIX = 'NUMISMATIC'
 
 pass_state = click.make_pass_decorator(dict, ensure=True)

@@ -8,9 +8,11 @@ from dateutil.parser import parse
 from .base import Feed, RestClient
 from ..libs.utils import date_range, make_list_str, to_datetime, \
     dates_and_frequencies
+from ..config import config
 
 
 logger = logging.getLogger(__name__)
+config = config['CryptoCompare']
 
 
 class CryptoCompareFeed(Feed):

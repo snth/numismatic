@@ -9,17 +9,20 @@ import websockets
 
 from .base import Feed, WebsocketClient, STOP_HANDLERS
 from ..events import Heartbeat, Trade
+from ..config import config
 
 logger = logging.getLogger(__name__)
+config = config['GDAX']
 
 
 class GDAXFeed(Feed):
 
     def __init__(self, **kwargs):
         self.rest_client = None
-        self.websocket_client = GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
-                                          in attr.fields(GDAXWebsocketClient)
-                                          if a.name in kwargs})
+        self.websocket_client = \
+            GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
+                                   in attr.fields(GDAXWebsocketClient)
+                                   if a.name in kwargs})
         
     @staticmethod
     def get_symbol(asset, currency):
