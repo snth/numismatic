@@ -13,6 +13,7 @@ import attr
 import websockets
 
 from ..requesters import Requester
+from ..config import config
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,10 @@ class Feed(abc.ABC):
 
     rest_client = attr.ib(default=None)
     websocket_client = attr.ib(default=None)
+
+    @property
+    def config(self):
+        return config[self.__class__.__name__]
         
     @staticmethod
     def get_symbol(asset, currency):
@@ -59,19 +64,23 @@ class Feed(abc.ABC):
         return
 
     def subscribe(self, assets, currencies, channels):
-        assets = ','.join(assets).split(',')
-        currencies = ','.join(currencies).split(',')
-        channels = ','.join(channels).split(',')
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
+        channels = self._validate_parameter('channels', channels)
         subscriptions = {}
         for symbol, channel in product(self._get_pairs(assets, currencies),
                                        channels):
             if self.websocket_client is not None:
                 subscription = self.websocket_client.listen(symbol, channel)
             else:
-                raise NotImplementedError
+                raise ValueError('websocket_client is None')
             subscriptions[subscription.market_name] = subscription
         return subscriptions
 
+    def _validate_parameter(self, parameter, value):
+        if not value:
+            value = self.config[parameter]
+        return value.split(',') if isinstance(value, str) else value
 
     def __getattr__(self, attr):
         if self.rest_client is not None and hasattr(self.rest_client, attr):

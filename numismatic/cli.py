@@ -1,6 +1,6 @@
 import logging
 import click
-from itertools import chain, product
+from itertools import chain
 from collections import namedtuple
 import asyncio
 
@@ -18,15 +18,12 @@ logger = logging.getLogger(__name__)
 AsyncIOMainLoop().install()
 
 
-DEFAULT_ASSETS = config['DEFAULT']['assets'].split(',')
-DEFAULT_CURRENCIES = config['DEFAULT']['currencies'].split(',')
 ENVVAR_PREFIX = 'NUMISMATIC'
+
 
 pass_state = click.make_pass_decorator(dict, ensure=True)
 
 @click.group(chain=True)
-@click.option('--feed', '-f', default='cryptocompare',
-              type=click.Choice(Feed._get_subclasses().keys()))
 @click.option('--cache-dir', '-d', default=None)
 @click.option('--requester', '-r', default='base',
               type=click.Choice(['base', 'caching']))
@@ -34,7 +31,7 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
               type=click.Choice(['debug', 'info', 'warning', 'error',
                                  'critical']))
 @pass_state
-def coin(state, feed, cache_dir, requester, log_level):
+def coin(state, cache_dir, requester, log_level):
     '''Numismatic Command Line Interface
 
     Examples:
@@ -49,9 +46,7 @@ def coin(state, feed, cache_dir, requester, log_level):
 
         coin prices -a XMR,ZEC -c EUR,ZAR
 
-        coin -f luno prices -a XBT -c ZAR
-
-        NUMISMATIC_CURRENCIES=ZAR coin prices
+        coin prices -f luno
 
         coin history
 
@@ -69,73 +64,79 @@ def coin(state, feed, cache_dir, requester, log_level):
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
-    state['datafeed'] = Feed.factory(feed, cache_dir=cache_dir,
-                                     requester=requester)
+    state['requester'] = requester
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
 
 @coin.command(name='list')
+@click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
+              type=click.Choice(Feed._get_subclasses().keys()))
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def list_all(state, output):
+def list_all(state, feed, output):
     "List all available assets"
-    datafeed = state['datafeed']
-    assets_list = datafeed.get_list()
+    feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
+                               requester=state['requester'])
+    assets_list = feed_client.get_list()
     write(assets_list, output, sep=' ')
 
 @coin.command()
-@click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
+@click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
+              type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--assets', '-a', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def info(state, assets, output):
+def info(state, feed, assets, output):
     "Info about the requested assets"
-    assets = ','.join(assets)
-    datafeed = state['datafeed']
-    assets_info = datafeed.get_info(assets)
+    feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
+                               requester=state['requester'])
+    assets_info = feed_client.get_info(assets)
     write(assets_info, output)
 
 
 @coin.command()
-@click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
+@click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
+              type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--assets', '-a', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
-@click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
+@click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def prices(state, assets, currencies, output):
+def prices(state, feed, assets, currencies, output):
     'Latest asset prices'
-    # FIXME: This should also use split here to be consistent
-    assets = ','.join(assets)
-    currencies = ','.join(currencies)
-    datafeed = state['datafeed']
-    prices = datafeed.get_prices(assets=assets, currencies=currencies)
+    feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
+                               requester=state['requester'])
+    prices = feed_client.get_prices(assets=assets, currencies=currencies)
     write(prices, output)
 
 
 @coin.command()
-@click.option('--freq', '-f', default='d', type=click.Choice(list('dhms')))
+@click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
+              type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--freq', default='d', type=click.Choice(list('dhms')))
 @click.option('--start-date', '-s', default=-30)
 @click.option('--end-date', '-e', default=None)
-@click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
+@click.option('--assets', '-a', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
-@click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
+@click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def history(state, assets, currencies, freq, start_date, end_date, output):
+def history(state, feed, assets, currencies, freq, start_date, end_date,
+            output):
     'Historic asset prices and volumes'
-    assets = ','.join(assets).split(',')
-    currencies = ','.join(currencies).split(',')
-    datafeed = state['datafeed']
-    data = []
-    for asset, currency in product(assets, currencies):
-        pair_data = datafeed.get_historical_data(
-            asset, currency, freq=freq, start_date=start_date, end_date=end_date)
-        data.extend(pair_data)
+    # FIXME: move the loop below into the Feed class
+    feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
+                               requester=state['requester'])
+    data = feed_client.get_historical_data(assets, currencies, freq=freq,
+                                           start_date=start_date,
+                                           end_date=end_date)
     write(data, output)
 
 
+# FIXME: Do we still want this?
 def tabulate(data):
     if isinstance(data, dict):
         data_iter = data.values()
@@ -152,9 +153,9 @@ def tabulate(data):
 @coin.command()
 @click.option('--feed', '-f', default='bitfinex',
               type=click.Choice(Feed._get_subclasses().keys()))
-@click.option('--assets', '-a', multiple=True, default=DEFAULT_ASSETS,
+@click.option('--assets', '-a', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
-@click.option('--currencies', '-c', multiple=True, default=DEFAULT_CURRENCIES,
+@click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--raw-output', '-r', default=None, help="Path to write raw "
               "stream to")
@@ -163,19 +164,15 @@ def tabulate(data):
               "to disk")
 # FIXME: The --channel and --api-key-* options are Feed specific and 
 #        should probably be handled differently.
-@click.option('--channels', '-C', multiple=True, default=['trades'])
+@click.option('--channels', '-C', multiple=True)
 @click.option('--api-key-id', default=None)
 @click.option('--api-key-secret', default=None)
 @pass_state
 def listen(state, feed, assets, currencies, raw_output, raw_interval, 
            channels, api_key_id, api_key_secret):
     'Listen to live events from a feed'
-    feed_name = feed
-    assets = ','.join(assets).upper().split(',')
-    currencies = ','.join(currencies).upper().split(',')
-    channels = ','.join(channels).lower().split(',')
-    feed = Feed.factory(feed_name) 
-    subscriptions = feed.subscribe(assets, currencies, channels)
+    feed_client = Feed.factory(feed) 
+    subscriptions = feed_client.subscribe(assets, currencies, channels)
     state['subscriptions'].update(subscriptions)
 
 

@@ -1,11 +1,9 @@
 import logging
 
 from .base import Feed, RestClient
-from ..config import config
 
 
 logger = logging.getLogger(__name__)
-config = config['BraveNewCoin']
 
 
 class BraveNewCoinFeed(Feed):
@@ -28,9 +26,13 @@ class BraveNewCoinFeed(Feed):
         raise NotImplementedError('Not available for this feed.') 
 
     def get_prices(self, assets, currencies):
-        """Not the most efficient method as BNC does not
+        '''Latest prices for assets in given currencies
+        
+        Not the most efficient method as BNC does not
         allow a list for input. So we iterate over each
-        asset and currency and make separate calls"""
+        asset and currency and make separate calls'''
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
         response = []
         for asset in assets.split(','):
             for currency in currencies.split(','):

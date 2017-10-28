@@ -8,22 +8,31 @@ import websockets
 
 from ..events import Heartbeat, Trade, Order
 from .base import Feed, RestClient, WebsocketClient, STOP_HANDLERS
-from ..config import config
 
 
 logger = logging.getLogger(__name__)
-config = config['Luno']
 
 
 class LunoFeed(Feed):
 
+    api_key_id = attr.ib(default=None)
+    api_key_secret = attr.ib(default=None, repr=False)
+
     def __init__(self, **kwargs):
-        self.rest_client = LunoRestClient(**{a.name:kwargs[a.name] 
-                                       for a in attr.fields(LunoRestClient) 
-                                       if a.name in kwargs})
-        self.websocket_client = LunoWebsocketClient(**{a.name:kwargs[a.name] for a 
-                                          in attr.fields(LunoWebsocketClient)
-                                          if a.name in kwargs})
+        self.api_key_id = \
+            kwargs.setdefault('api_key_id', self.config.get('api_key_id', ''))
+        self.api_key_secret = \
+            kwargs.setdefault('api_key_secret',
+                              self.config.get('api_key_secret', ''))
+            
+        self.rest_client = \
+            LunoRestClient(**{a.name:kwargs[a.name] 
+                              for a in attr.fields(LunoRestClient) 
+                              if a.name in kwargs})
+        self.websocket_client = \
+            LunoWebsocketClient(**{a.name:kwargs[a.name] for a 
+                                   in attr.fields(LunoWebsocketClient)
+                                   if a.name in kwargs})
 
     def get_list(self):
         tickers = self.rest_client.get_tickers()
@@ -33,8 +42,8 @@ class LunoFeed(Feed):
         raise NotImplementedError('Not available for this feed.') 
 
     def get_prices(self, assets, currencies):
-        assets = assets.upper().split(',')
-        currencies = currencies.upper().split(',')
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
         tickers = self.rest_client.get_tickers()
         pairs = {f'{asset}{currency}' for asset, currency in 
                  product(assets, currencies)}
@@ -44,6 +53,9 @@ class LunoFeed(Feed):
 class LunoRestClient(RestClient):
 
     api_url = 'https://api.mybitx.com/api/1/'
+
+    api_key_id = attr.ib(default=None)
+    api_key_secret = attr.ib(default=None, repr=False)
 
     def get_tickers(self):
         api_url = f'{self.api_url}/tickers'
@@ -61,15 +73,6 @@ class LunoWebsocketClient(WebsocketClient):
 
     api_key_id = attr.ib(default=None)
     api_key_secret = attr.ib(default=None, repr=False)
-
-    @api_key_id.validator
-    def __validate_api_key_id(self, attribute, value):
-        self.api_key_id = value if value else config.get('api_key_id', '')
-
-    @api_key_secret.validator
-    def __validate_api_key_secret(self, attribute, value):
-        self.api_key_secret = value if value else \
-            config.get('api_key_secret', '')
 
     async def _connect(self, subscription):
         websocket_url = f'{self.websocket_url}/{subscription.symbol}'

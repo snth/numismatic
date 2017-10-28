@@ -9,10 +9,8 @@ import websockets
 
 from .base import Feed, WebsocketClient, STOP_HANDLERS
 from ..events import Heartbeat, Trade
-from ..config import config
 
 logger = logging.getLogger(__name__)
-config = config['GDAX']
 
 
 class GDAXFeed(Feed):
