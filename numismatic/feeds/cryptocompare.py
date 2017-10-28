@@ -4,6 +4,9 @@ import abc
 import time
 from datetime import timedelta
 from dateutil.parser import parse
+from itertools import product
+
+import attr
 
 from .base import Feed, RestClient
 from ..libs.utils import date_range, make_list_str, to_datetime, \
@@ -17,9 +20,8 @@ class CryptoCompareFeed(Feed):
 
     _interval_limit = 2000
 
-    def __init__(self, requester='basic', cache_dir=None):
-        self.rest_client = CryptoCompareRestClient(requester=requester,
-                                             cache_dir=cache_dir)
+    def __init__(self, *args, **kwargs):
+        self.rest_client = CryptoCompareRestClient(*args, **kwargs)
         self.websocket_client = None
 
     def get_list(self):
@@ -27,14 +29,14 @@ class CryptoCompareFeed(Feed):
         return coinlist.keys()
 
     def get_info(self, assets):
-        assets = assets.upper().split(',')
+        assets = self._validate_parameter('assets', assets)
         coinlist = self.rest_client.get_coinlist()
         assets_info = [coinlist[a] for a in assets]
         return assets_info
 
     def get_prices(self, assets, currencies):
-        assets = assets.upper().split(',')
-        currencies = currencies.upper().split(',')
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
         # FIXME: SHouldn't use caching
         data = self.rest_client.get_latest_price_multi(assets, currencies)
         prices = [{'asset':asset, 'currency':currency, 'price':price}
@@ -42,17 +44,20 @@ class CryptoCompareFeed(Feed):
                   for currency, price in asset_prices.items()]
         return prices
 
-    def get_historical_data(self, asset, currency, freq='d', end_date=None,
+    def get_historical_data(self, assets, currencies, freq='d', end_date=None,
                             start_date=-30, exchange=None):
-        asset = asset.upper()
-        currency = currency.upper()
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
         start_date, end_date, freqstr, intervals = \
             dates_and_frequencies(start_date, end_date, freq)
         limit = min(intervals, self._interval_limit)
         dates = date_range(start_date, end_date, **{freqstr:limit})
 
         data = []
-        for start, end in zip(dates[:-1], dates[1:]):
+        for asset, currency, (start, end) in \
+                product(assets, currencies, zip(dates[:-1], dates[1:])):
+            asset = asset.upper()
+            currency = currency.upper()
             toTs = math.ceil(end.timestamp())
             limit = math.ceil((end-start)/timedelta(**{freqstr:1}))
             logger.debug(f'Getting {asset}/{currency} for {limit}{freqstr} to {end}')
@@ -71,10 +76,13 @@ class CryptoCompareFeed(Feed):
                     toTs=toTs)
             else:
                 raise NotImplementedError(f'freq={freq}')
-            data.extend(chunk)
+            annotated_chunk = [{**{'asset':asset, 'currency':currency},
+                                **item} for item in chunk]
+            data.extend(annotated_chunk)
         return data
 
 
+@attr.s
 class CryptoCompareRestClient(RestClient):
     '''Low level API for CryptoCompare.com
 
@@ -84,9 +92,6 @@ class CryptoCompareRestClient(RestClient):
 
     base_url = 'https://www.cryptocompare.com/api/data/'
     api_url = 'https://min-api.cryptocompare.com/data'
-
-    def __init__(self, requester='basic', cache_dir=None):
-        super().__init__(requester=requester, cache_dir=cache_dir)
 
     def get_coinlist(self):
         api_url = f'{self.base_url}/coinlist'

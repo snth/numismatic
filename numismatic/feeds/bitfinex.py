@@ -16,9 +16,10 @@ class BitfinexFeed(Feed):
 
     def __init__(self, **kwargs):
         self.rest_client = None
-        self.websocket_client = BitfinexWebsocketClient(**{a.name:kwargs[a.name] for a in 
-                                              attr.fields(BitfinexWebsocketClient)
-                                              if a.name in kwargs})
+        self.websocket_client = \
+            BitfinexWebsocketClient(**{a.name:kwargs[a.name] for a in 
+                                       attr.fields(BitfinexWebsocketClient)
+                                       if a.name in kwargs})
 
     def get_list(self):
         raise NotImplemented()

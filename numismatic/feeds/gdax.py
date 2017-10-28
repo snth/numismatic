@@ -17,9 +17,10 @@ class GDAXFeed(Feed):
 
     def __init__(self, **kwargs):
         self.rest_client = None
-        self.websocket_client = GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
-                                          in attr.fields(GDAXWebsocketClient)
-                                          if a.name in kwargs})
+        self.websocket_client = \
+            GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
+                                   in attr.fields(GDAXWebsocketClient)
+                                   if a.name in kwargs})
         
     @staticmethod
     def get_symbol(asset, currency):
