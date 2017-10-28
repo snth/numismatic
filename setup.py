@@ -22,6 +22,9 @@ setup(name='numismatic',
       long_description=README,
       install_requires=REQUIREMENTS,
       python_requires='~=3.6',
+      extras_require={
+        'SQL': ['sqlalchemy'],
+        },
       zip_safe=False,
       entry_points='''
           [console_scripts]

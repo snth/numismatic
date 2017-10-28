@@ -7,7 +7,7 @@ import attr
 import websockets
 
 from .base import Feed, WebsocketClient, STOP_HANDLERS
-from ..events import Heartbeat, Trade, LimitOrder, CancelOrder
+from ..events import Heartbeat, Trade
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,9 @@ class BitfinexWebsocketClient(WebsocketClient):
             # FIXME: validate the channel_id below
             msg = Trade(exchange=subscription.exchange, 
                         symbol=subscription.symbol, 
-                        timestamp=timestamp/1000, price=price, volume=volume,
+                        price=price,
+                        volume=volume,
+                        timestamp=timestamp/1000,
                         id=trade_id)
             subscription.event_stream.emit(msg)
             # stop processing other handlers
@@ -131,8 +133,10 @@ class BitfinexWebsocketClient(WebsocketClient):
             for (trade_id, timestamp, volume, price) in reversed(msg[1]):
                 msg = Trade(exchange=subscription.exchange,
                             symbol=subscription.symbol, 
-                            timestamp=timestamp/1000, price=price, 
-                            volume=volume, id=trade_id)
+                            price=price, 
+                            volume=volume,
+                            timestamp=timestamp/1000,
+                            id=trade_id)
                 subscription.event_stream.emit(msg)
             # stop processing other handlers
             return STOP_HANDLERS

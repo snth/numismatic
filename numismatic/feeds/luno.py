@@ -6,7 +6,7 @@ import time
 import attr
 import websockets
 
-from ..events import Heartbeat, Trade, LimitOrder, CancelOrder
+from ..events import Heartbeat, Trade, Order
 from .base import Feed, RestClient, WebsocketClient, STOP_HANDLERS
 from ..libs.config import get_config
 
@@ -89,29 +89,25 @@ class LunoWebsocketClient(WebsocketClient):
 
     @staticmethod
     def _handle_order_book(msg, subscription):
-        timestamp = time.time()
-        print(type(msg))
         if 'asks' in msg:
-            sign = -1
             for order in msg['asks']:
-                id = order['id']
-                volume = float(order['volume'])
-                price = sign * float(order['price'])
-                order_ev = LimitOrder(exchange=subscription.exchange,
-                                      symbol=subscription.symbol,
-                                      timestamp=timestamp, price=price,
-                                      volume=volume, id=id)
+                order_ev = Order(exchange=subscription.exchange,
+                                 symbol=subscription.symbol,
+                                 price=order['price'],
+                                 volume=order['volume'],
+                                 type='SELL',
+                                 id=order['id'], 
+                                 )
                 subscription.event_stream.emit(order_ev)
         if 'bids' in msg:
-            sign = 1
             for order in msg['bids']:
-                id = order['id']
-                volume = float(order['volume'])
-                price = sign * float(order['price'])
-                order_ev = LimitOrder(exchange=subscription.exchange,
-                                      symbol=subscription.symbol,
-                                      timestamp=timestamp, price=price,
-                                      volume=volume, id=id)
+                order_ev = Order(exchange=subscription.exchange,
+                                 symbol=subscription.symbol,
+                                 price=order['price'],
+                                 volume=order['volume'],
+                                 type='BUY',
+                                 id=order['id'], 
+                                 )
                 subscription.event_stream.emit(order_ev)
         if 'asks' in msg and 'bids' in msg:
             # restore normal handlers
@@ -128,11 +124,14 @@ class LunoWebsocketClient(WebsocketClient):
                 volume = float(trade['base'])
                 value = float(trade['counter'])
                 price = value/volume
-                id = trade['order_id']
                 trade_ev = Trade(exchange=subscription.exchange,
                                  symbol=subscription.symbol,
-                                 timestamp=timestamp, price=price,
-                                 volume=volume, id=id)
+                                 price=price,
+                                 volume=volume,
+                                 type='TRADE',
+                                 timestamp=timestamp,
+                                 id=trade['order_id'],
+                                 )
                 subscription.event_stream.emit(trade_ev)
             # need to process further handlers so no STOP_HANDLERS
 
@@ -143,14 +142,14 @@ class LunoWebsocketClient(WebsocketClient):
         timestamp = float(msg['timestamp'])/1000
         if 'create_update' in msg and msg['create_update']:
             order = msg['create_update']
-            sign = 1 if order['type']=='BID' else -1
-            id = order['order_id']
-            volume = float(order['volume'])
-            price = sign * float(order['price'])
-            order_ev = LimitOrder(exchange=subscription.exchange,
-                                  symbol=subscription.symbol, 
-                                  timestamp=timestamp,
-                                  price=price, volume=volume, id=id)
+            order_ev = Order(exchange=subscription.exchange,
+                             symbol=subscription.symbol,
+                             price=order['price'],
+                             volume=order['volume'],
+                             type='BUY' if order['type']=='BID' else 'SELL',
+                             timestamp=timestamp,
+                             id=order['order_id'],
+                             )
             subscription.event_stream.emit(order_ev)
             # need to process further handlers so no STOP_HANDLERS
 
@@ -160,11 +159,13 @@ class LunoWebsocketClient(WebsocketClient):
         #       events
         timestamp = float(msg['timestamp'])/1000
         if 'delete_update' in msg and msg['delete_update']:
-            delete_update = msg['delete_update']
-            id = delete_update['order_id']
-            cancel_ev = CancelOrder(exchange=subscription.exchange,
-                                    symbol=subscription.symbol, 
-                                    timestamp=timestamp, id=id)
+            order = msg['delete_update']
+            cancel_ev = Order(exchange=subscription.exchange,
+                              symbol=subscription.symbol,
+                              timestamp=timestamp,
+                              type='CANCEL',
+                              id=order['order_id'],
+                              )
             subscription.event_stream.emit(cancel_ev)
             # need to process further handlers so no STOP_HANDLERS
 

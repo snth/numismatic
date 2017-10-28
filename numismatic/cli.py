@@ -180,7 +180,6 @@ def listen(state, feed, assets, currencies, raw_output, raw_interval,
     feed = Feed.factory(feed_name) 
     subscriptions = feed.subscribe(assets, currencies, channels)
     state['subscriptions'].update(subscriptions)
-    print(state['subscriptions'].keys())
 
 
 @coin.command()
