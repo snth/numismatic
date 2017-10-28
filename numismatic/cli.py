@@ -5,9 +5,10 @@ from collections import namedtuple
 import asyncio
 
 from tornado.platform.asyncio import AsyncIOMainLoop
-from streamz import Stream, union
+from streamz import Stream, union, combine_latest, zip_latest
 import attr
 
+from .events import Trade
 from .collectors import Collector
 from .feeds import Feed
 from .libs.config import get_config
@@ -64,6 +65,10 @@ def coin(state, feed, cache_dir, requester, log_level):
         coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
 
         coin listen -f bitfinex -f gdax collect run
+
+        coin listen -f bitfinex -f gdax collect --raw run
+
+        coin listen -f bitfinex -f gdax compare run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
@@ -212,6 +217,24 @@ def collect(state, market, stream, collector, filter, type, output, format, inte
     collector = Collector.factory(collector_name, event_stream=collect_stream,
                                   path=output, format=format, types=type,
                                   filters=filter, interval=interval)
+
+
+@coin.command()
+@click.option('--collector', '-c', default='file', 
+              type=click.Choice(Collector._get_subclasses().keys()))
+@click.option('--output', '-o', default='-', type=click.Path())
+@click.option('--interval', '-i', default=None, type=float)
+@pass_state
+def compare(state, collector, output, interval):
+    'Compare prices events and write them to an output sink'
+    subscriptions = state['subscriptions']
+    streams = [sub.event_stream.filter(lambda ev: isinstance(ev, Trade)) 
+               for sub in subscriptions.values()]
+    compare_stream = combine_latest(*streams).map(
+        lambda trades: {(t.exchange+'--'+t.symbol):t.price for t in trades})
+    collector_name = collector
+    collector = Collector.factory(collector_name, event_stream=compare_stream,
+                                  path=output, interval=interval)
 
 
 @coin.command()
