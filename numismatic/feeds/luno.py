@@ -8,6 +8,7 @@ import websockets
 
 from ..events import Heartbeat, Trade, Order
 from .base import Feed, RestClient, WebsocketClient, STOP_HANDLERS
+from ..config import config_item_getter
 
 
 logger = logging.getLogger(__name__)
@@ -15,16 +16,7 @@ logger = logging.getLogger(__name__)
 
 class LunoFeed(Feed):
 
-    api_key_id = attr.ib(default=None)
-    api_key_secret = attr.ib(default=None, repr=False)
-
     def __init__(self, **kwargs):
-        self.api_key_id = \
-            kwargs.setdefault('api_key_id', self.config.get('api_key_id', ''))
-        self.api_key_secret = \
-            kwargs.setdefault('api_key_secret',
-                              self.config.get('api_key_secret', ''))
-            
         self.rest_client = \
             LunoRestClient(**{a.name:kwargs[a.name] 
                               for a in attr.fields(LunoRestClient) 
@@ -54,8 +46,10 @@ class LunoRestClient(RestClient):
 
     api_url = 'https://api.mybitx.com/api/1/'
 
-    api_key_id = attr.ib(default=None)
-    api_key_secret = attr.ib(default=None, repr=False)
+    api_key_id = attr.ib(default=attr.Factory(
+        config_item_getter('LunoFeed', 'api_key_id')))
+    api_key_secret = attr.ib(default=attr.Factory(
+        config_item_getter('LunoFeed', 'api_key_secret')), repr=False)
 
     def get_tickers(self):
         api_url = f'{self.api_url}/tickers'
@@ -71,8 +65,10 @@ class LunoWebsocketClient(WebsocketClient):
     exchange = 'Luno'
     websocket_url = 'wss://ws.luno.com/api/1/stream'
 
-    api_key_id = attr.ib(default=None)
-    api_key_secret = attr.ib(default=None, repr=False)
+    api_key_id = attr.ib(default=attr.Factory(
+        config_item_getter('LunoFeed', 'api_key_id')))
+    api_key_secret = attr.ib(default=attr.Factory(
+        config_item_getter('LunoFeed', 'api_key_secret')), repr=False)
 
     async def _connect(self, subscription):
         websocket_url = f'{self.websocket_url}/{subscription.symbol}'

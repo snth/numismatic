@@ -1,6 +1,9 @@
 import logging
 
+import attr
+
 from .base import Feed, RestClient
+from ..config import config_item_getter
 
 
 logger = logging.getLogger(__name__)
@@ -8,11 +11,8 @@ logger = logging.getLogger(__name__)
 
 class BraveNewCoinFeed(Feed):
 
-    def __init__(self, requester='basic', cache_dir=None, api_key_id=None,
-                 api_key_secret=None):
-        self.rest_client = BraveNewCoinRestClient(
-            requester=requester, cache_dir=cache_dir, api_key_id=api_key_id,
-            api_key_secret=api_key_secret)
+    def __init__(self, *args, **kwargs):
+        self.rest_client = BraveNewCoinRestClient(*args, **kwargs)
         self.websocket_client = None
 
     def get_list(self): 
@@ -34,32 +34,27 @@ class BraveNewCoinFeed(Feed):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         response = []
-        for asset in assets.split(','):
-            for currency in currencies.split(','):
+        for asset in assets:
+            for currency in currencies:
                 data = self.rest_client.get_ticker(coin=asset, show=currency)
                 response.append({'asset':asset, 'currency':currency, 
                                  'price': float(data['last_price'])})
         return response
 
 
+@attr.s
 class BraveNewCoinRestClient(RestClient):
 
     api_url = 'https://bravenewcoin-v1.p.mashape.com/'
 
-    def __init__(self, requester='basic', cache_dir=None, api_key_id=None,
-                 api_key_secret=None):
-        # Should the requester and cache_dir not also be settable in config?
-        super().__init__(requester=requester, cache_dir=cache_dir)
-        
-        if api_key_id is None:
-            # X-Mashape-Key is the default id
-            api_key_id = config.get('api_key_id', 'X-Mashape-Key')
-        
-        if api_key_secret is None:
-            api_key_secret = config['api_key_secret']
+    api_key_id = attr.ib(default=attr.Factory(
+        config_item_getter('BraveNewCoinFeed', 'api_key_id', 'X-Mashape-Key')))
+    api_key_secret = attr.ib(default=attr.Factory(
+        config_item_getter('BraveNewCoinFeed', 'api_key_secret')), repr=False)
 
-        assert api_key_secret, api_key_id
-        self.headers = {api_key_id: api_key_secret}
+    @property
+    def headers(self):
+        return {self.api_key_id: self.api_key_secret}
 
     def get_digital_currency_symbols(self): 
         api_url = f'{self.api_url}/digital-currency-symbols'

@@ -13,7 +13,7 @@ import attr
 import websockets
 
 from ..requesters import Requester
-from ..config import config
+from ..config import ConfigMixin
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +37,11 @@ class Subscription:
 
 
 @attr.s
-class Feed(abc.ABC):
+class Feed(abc.ABC, ConfigMixin):
     "Feed Base class"
 
     rest_client = attr.ib(default=None)
     websocket_client = attr.ib(default=None)
-
-    @property
-    def config(self):
-        return config[self.__class__.__name__]
         
     @staticmethod
     def get_symbol(asset, currency):
@@ -79,7 +75,8 @@ class Feed(abc.ABC):
 
     def _validate_parameter(self, parameter, value):
         if not value:
-            value = self.config[parameter]
+            # value = self.config[parameter]
+            value = self.get_config_item(parameter)
         return value.split(',') if isinstance(value, str) else value
 
     def __getattr__(self, attr):
