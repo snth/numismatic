@@ -24,7 +24,6 @@ STOP_HANDLERS = object()        # sentinel to signal end of handler processing
 
 @attr.s
 class Subscription:
-    market_name = attr.ib()
     exchange = attr.ib()
     symbol = attr.ib()
     channel = attr.ib()
@@ -34,6 +33,10 @@ class Subscription:
     raw_stream = attr.ib(default=attr.Factory(Stream))
     event_stream = attr.ib(default=attr.Factory(Stream))
     handlers = attr.ib(default=attr.Factory(list))
+
+    @property
+    def market_name(self):
+        return f'{self.exchange}--{self.symbol}--{self.channel}'
 
 
 @attr.s
@@ -124,10 +127,8 @@ class WebsocketClient(abc.ABC):
     def listen(self, symbol, channel=None, websocket_url=None):
         symbol = symbol.upper()
         # set up the subscription
-        market_name = f'{self.exchange}--{symbol}--{channel}'
         channel_info = {'channel': channel}
-        subscription = Subscription(market_name=market_name,
-                                    exchange=self.exchange, 
+        subscription = Subscription(exchange=self.exchange, 
                                     symbol=symbol,
                                     channel=channel,
                                     channel_info=channel_info, 
