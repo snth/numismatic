@@ -14,34 +14,6 @@ from ..config import config_item_getter
 logger = logging.getLogger(__name__)
 
 
-class LunoFeed(Feed):
-
-    def __init__(self, **kwargs):
-        self.rest_client = \
-            LunoRestClient(**{a.name:kwargs[a.name] 
-                              for a in attr.fields(LunoRestClient) 
-                              if a.name in kwargs})
-        self.websocket_client = \
-            LunoWebsocketClient(**{a.name:kwargs[a.name] for a 
-                                   in attr.fields(LunoWebsocketClient)
-                                   if a.name in kwargs})
-
-    def get_list(self):
-        tickers = self.rest_client.get_tickers()
-        return [ticker['pair'] for ticker in tickers]
-
-    def get_info(self, assets):
-        raise NotImplementedError('Not available for this feed.') 
-
-    def get_prices(self, assets, currencies):
-        assets = self._validate_parameter('assets', assets)
-        currencies = self._validate_parameter('currencies', currencies)
-        tickers = self.rest_client.get_tickers()
-        pairs = {f'{asset}{currency}' for asset, currency in 
-                 product(assets, currencies)}
-        return [ticker for ticker in tickers if ticker['pair'] in pairs]
-
-
 class LunoRestClient(RestClient):
 
     api_url = 'https://api.mybitx.com/api/1/'
@@ -166,6 +138,27 @@ class LunoWebsocketClient(WebsocketClient):
                               )
             subscription.event_stream.emit(cancel_ev)
             # need to process further handlers so no STOP_HANDLERS
+
+
+class LunoFeed(Feed):
+
+    _rest_client_class = LunoRestClient
+    _websocket_client_class = LunoWebsocketClient
+
+    def get_list(self):
+        tickers = self.rest_client.get_tickers()
+        return [ticker['pair'] for ticker in tickers]
+
+    def get_info(self, assets):
+        raise NotImplementedError('Not available for this feed.') 
+
+    def get_prices(self, assets, currencies):
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
+        tickers = self.rest_client.get_tickers()
+        pairs = {f'{asset}{currency}' for asset, currency in 
+                 product(assets, currencies)}
+        return [ticker for ticker in tickers if ticker['pair'] in pairs]
 
 
 if __name__=='__main__':
