@@ -12,25 +12,6 @@ from ..events import Heartbeat, Trade
 logger = logging.getLogger(__name__)
 
 
-class BitfinexFeed(Feed):
-
-    def __init__(self, **kwargs):
-        self.rest_client = None
-        self.websocket_client = \
-            BitfinexWebsocketClient(**{a.name:kwargs[a.name] for a in 
-                                       attr.fields(BitfinexWebsocketClient)
-                                       if a.name in kwargs})
-
-    def get_list(self):
-        raise NotImplemented()
-
-    def get_info(self, assets):
-        raise NotImplemented()
- 
-    def get_prices(self, assets, currencies):
-        raise NotImplemented()       
-
-
 @attr.s
 class BitfinexWebsocketClient(WebsocketClient):
     '''Websocket client for the Bitfinex WebsocketClient
@@ -54,7 +35,8 @@ class BitfinexWebsocketClient(WebsocketClient):
         # it needs to go through the main __handle_packet so the raw_stream is
         # updated.
         subscription.handlers = [self.__handle_subscribed]
-        msg = json.dumps(dict(event='subscribe', channel=subscription.channel, 
+        msg = json.dumps(dict(event='subscribe',
+                              channel=subscription.channel, 
                               symbol=subscription.symbol))
         logger.info(msg)
         await self.websocket.send(msg)
@@ -63,8 +45,10 @@ class BitfinexWebsocketClient(WebsocketClient):
     @staticmethod
     def __handle_subscribed(msg, subscription):
         if isinstance(msg, dict) and 'event' in msg and \
-                msg['event']=='subscribed':
+                msg['event']=='subscribed' and \
+                msg['pair']==subscription.symbol:
             subscription.channel_info = msg
+            # TODO: Make the following a debug log message rather
             logger.info(subscription.channel_info)
             # install the proper handlers
             subscription.handlers = subscription.client._get_handlers()
@@ -80,7 +64,8 @@ class BitfinexWebsocketClient(WebsocketClient):
     @staticmethod
     def __handle_unsubscribed(msg, subscription):
         if isinstance(msg, dict) and 'event' in msg and \
-                msg['event']=='unsubscribed':
+                msg['event']=='unsubscribed' and \
+                msg['chanId']==subscription.channel_info['chanId']:
             confirmation = msg
             logger.info(confirmation)
             # disable all handlers
@@ -98,7 +83,9 @@ class BitfinexWebsocketClient(WebsocketClient):
 
     @staticmethod
     def handle_heartbeat(msg, subscription):
-        if isinstance(msg, list) and len(msg) in {2,3} and msg[1]=='hb':
+        if isinstance(msg, list) and \
+                msg[0]==subscription.channel_info['chanId'] and \
+                msg[1]=='hb':
             msg = Heartbeat(exchange=subscription.exchange,
                             symbol=subscription.symbol,
                             timestamp=time.time())
@@ -108,7 +95,10 @@ class BitfinexWebsocketClient(WebsocketClient):
 
     @staticmethod
     def handle_trade(msg, subscription):
-        if isinstance(msg, list) and len(msg)==3:
+        if isinstance(msg, list) and \
+                msg[0]==subscription.channel_info['chanId'] and \
+                msg[1]=='tu':
+                # TODO: There is also the 'te' trade type? What for?
             try:
                 channel_id, trade_type, (trade_id, timestamp, volume, price) = msg
             except TypeError as e:
@@ -129,7 +119,9 @@ class BitfinexWebsocketClient(WebsocketClient):
 
     @staticmethod
     def handle_snapshot(msg, subscription):
-        if isinstance(msg, list) and len(msg)==2 and isinstance(msg[1], list):
+        if isinstance(msg, list) and \
+                msg[0]==subscription.channel_info['chanId'] and \
+                isinstance(msg[1], list):
             # snapshot
             for (trade_id, timestamp, volume, price) in reversed(msg[1]):
                 msg = Trade(exchange=subscription.exchange,
@@ -141,6 +133,20 @@ class BitfinexWebsocketClient(WebsocketClient):
                 subscription.event_stream.emit(msg)
             # stop processing other handlers
             return STOP_HANDLERS
+
+
+class BitfinexFeed(Feed):
+
+    _websocket_client_class = BitfinexWebsocketClient
+
+    def get_list(self):
+        raise NotImplemented()
+
+    def get_info(self, assets):
+        raise NotImplemented()
+ 
+    def get_prices(self, assets, currencies):
+        raise NotImplemented()       
 
 
 if __name__=='__main__':

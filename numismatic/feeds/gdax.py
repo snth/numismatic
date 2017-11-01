@@ -13,29 +13,6 @@ from ..events import Heartbeat, Trade
 logger = logging.getLogger(__name__)
 
 
-class GDAXFeed(Feed):
-
-    def __init__(self, **kwargs):
-        self.rest_client = None
-        self.websocket_client = \
-            GDAXWebsocketClient(**{a.name:kwargs[a.name] for a 
-                                   in attr.fields(GDAXWebsocketClient)
-                                   if a.name in kwargs})
-        
-    @staticmethod
-    def get_symbol(asset, currency):
-        return f'{asset}-{currency}'
-
-    def get_list(self):
-        raise NotImplemented()
-
-    def get_info(self, assets):
-        raise NotImplemented()
- 
-    def get_prices(self, assets, currencies):
-        raise NotImplemented()       
-
-
 @attr.s
 class GDAXWebsocketClient(WebsocketClient):
     '''Websocket client for the GDAX WebsocketClient
@@ -116,6 +93,24 @@ class GDAXWebsocketClient(WebsocketClient):
             subscription.event_stream.emit(msg)
             # stop processing other handlers
             return STOP_HANDLERS
+
+
+class GDAXFeed(Feed):
+
+    _websocket_client_class = GDAXWebsocketClient
+        
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}-{currency}'
+
+    def get_list(self):
+        raise NotImplemented()
+
+    def get_info(self, assets):
+        raise NotImplemented()
+ 
+    def get_prices(self, assets, currencies):
+        raise NotImplemented()       
 
 
 if __name__=='__main__':

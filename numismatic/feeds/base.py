@@ -18,13 +18,22 @@ from ..config import ConfigMixin
 logger = logging.getLogger(__name__)
 
 
-LIBRARY_NAME = 'numismatic'
 STOP_HANDLERS = object()        # sentinel to signal end of handler processing
+
+# TODO:
+#   * Websocket Client vs Subscription --> clarify and unify
+#   * Rename symbol to pair
+#  Terms
+#   * Asset: BTC
+#   * Currency: USD
+#   * Pair: BTC--USD
+#   * Market: Bitfinex--BTC--USD
+#   * Channel: trades or orders
+#   * Subscription: Trades--Bitfinex--BTC--USD
 
 
 @attr.s
 class Subscription:
-    market_name = attr.ib()
     exchange = attr.ib()
     symbol = attr.ib()
     channel = attr.ib()
@@ -35,13 +44,32 @@ class Subscription:
     event_stream = attr.ib(default=attr.Factory(Stream))
     handlers = attr.ib(default=attr.Factory(list))
 
+    @property
+    def market_name(self):
+        return f'{self.exchange}--{self.symbol}--{self.channel}'
+
 
 @attr.s
 class Feed(abc.ABC, ConfigMixin):
     "Feed Base class"
 
+    _rest_client_class = None
+    _websockt_client_class = None
+
     rest_client = attr.ib(default=None)
     websocket_client = attr.ib(default=None)
+
+    def __init__(self, **kwargs):
+        self.rest_client = None if self._rest_client_class is None else \
+            self._rest_client_class(
+                **{a.name:kwargs[a.name] for a in 
+                   attr.fields(self._rest_client_class)
+                   if a.name in kwargs})
+        self.websocket_client = None if self._websocket_client_class is None \
+            else self._websocket_client_class(
+                **{a.name:kwargs[a.name] for a in 
+                   attr.fields(self._websocket_client_class)
+                   if a.name in kwargs})
         
     @staticmethod
     def get_symbol(asset, currency):
@@ -59,25 +87,31 @@ class Feed(abc.ABC, ConfigMixin):
     def get_prices(self, assets, currencies):
         return
 
-    def subscribe(self, assets, currencies, channels):
-        assets = self._validate_parameter('assets', assets)
-        currencies = self._validate_parameter('currencies', currencies)
-        channels = self._validate_parameter('channels', channels)
+    @classmethod
+    def subscribe(cls, assets, currencies, channels):
+        assets = cls._validate_parameter('assets', assets)
+        currencies = cls._validate_parameter('currencies', currencies)
+        channels = cls._validate_parameter('channels', channels)
         subscriptions = {}
-        for symbol, channel in product(self._get_pairs(assets, currencies),
+        for symbol, channel in product(cls._get_pairs(assets, currencies),
                                        channels):
-            if self.websocket_client is not None:
-                subscription = self.websocket_client.listen(symbol, channel)
+            if cls._websocket_client_class is not None:
+                # Creates a new websocket_client for each subscription
+                # FIXME: Allow subscriptions on the same socket
+                websocket_client = cls._websocket_client_class()
+                subscription = websocket_client.listen(symbol, channel)
             else:
                 raise ValueError('websocket_client is None')
             subscriptions[subscription.market_name] = subscription
         return subscriptions
 
-    def _validate_parameter(self, parameter, value):
+    @classmethod
+    def _validate_parameter(cls, parameter, value):
         if not value:
             # value = self.config[parameter]
-            value = self.get_config_item(parameter)
-        return value.split(',') if isinstance(value, str) else value
+            value = cls.get_config_item(parameter)
+        return value.split(',') if isinstance(value, str) else \
+            ','.join(value).split(',')
 
     def __getattr__(self, attr):
         if self.rest_client is not None and hasattr(self.rest_client, attr):
@@ -116,6 +150,7 @@ class RestClient(abc.ABC):
 @attr.s
 class WebsocketClient(abc.ABC):
     '''Base class for WebsocketClient feeds'''
+    # FIXME: Is this really an ABC? What abstractmethods are there?
 
     exchange = None
     websocket_url = None
@@ -124,10 +159,8 @@ class WebsocketClient(abc.ABC):
     def listen(self, symbol, channel=None, websocket_url=None):
         symbol = symbol.upper()
         # set up the subscription
-        market_name = f'{self.exchange}--{symbol}--{channel}'
         channel_info = {'channel': channel}
-        subscription = Subscription(market_name=market_name,
-                                    exchange=self.exchange, 
+        subscription = Subscription(exchange=self.exchange, 
                                     symbol=symbol,
                                     channel=channel,
                                     channel_info=channel_info, 
