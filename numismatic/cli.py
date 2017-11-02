@@ -48,6 +48,8 @@ def coin(state, cache_dir, requester, log_level):
 
         coin prices -f luno
 
+        coin tickers -f cryptocompare
+
         coin history
 
         coin history -a ETH -c BTC -o ETH-BTH-history.json
