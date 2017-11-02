@@ -156,6 +156,7 @@ class WebsocketClient(abc.ABC):
     websocket_url = None
     websocket = attr.ib(default=None)
 
+    # FIXME: Should this not be named subscribe?
     def listen(self, symbol, channel=None, websocket_url=None):
         symbol = symbol.upper()
         # set up the subscription
