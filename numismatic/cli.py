@@ -274,11 +274,16 @@ def run(state, timeout):
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
     tasks = {name:asyncio.Task(sub.listener) for name, sub in
-             state['subscriptions'].items()}
+             state['subscriptions'].items() if sub.listener is not None}
     try:
-        completed, pending = \
-            loop.run_until_complete(asyncio.wait(tasks.values(), 
-                                    timeout=timeout))
+        if tasks:
+            logger.info(f'Running {len(tasks)} tasks ...')
+            completed, pending = \
+                loop.run_until_complete(asyncio.wait(tasks.values(), 
+                                        timeout=timeout))
+        else:
+            logger.info(f'Running forever ...')
+            loop.run_forever()
     except KeyboardInterrupt:
         pass
     finally:

@@ -93,21 +93,26 @@ class Feed(abc.ABC, ConfigMixin):
     def get_tickers(self, assets, currencies, raw=False):
         return
 
-    @classmethod
-    def subscribe(cls, assets, currencies, channels):
-        assets = cls._validate_parameter('assets', assets)
-        currencies = cls._validate_parameter('currencies', currencies)
-        channels = cls._validate_parameter('channels', channels)
+    def subscribe(self, assets, currencies, channels, interval=1.0):
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
+        channels = self._validate_parameter('channels', channels)
         subscriptions = {}
-        for symbol, channel in product(cls._get_pairs(assets, currencies),
+        for symbol, channel in product(self._get_pairs(assets, currencies),
                                        channels):
-            if cls._websocket_client_class is not None:
+            if self._rest_client_class is not None:
                 # Creates a new websocket_client for each subscription
                 # FIXME: Allow subscriptions on the same socket
-                websocket_client = cls._websocket_client_class()
+                rest_client = self._rest_client_class()
+                subscription = rest_client.listen(symbol, self,
+                                                  interval=interval)
+            elif self._websocket_client_class is not None:
+                # Creates a new websocket_client for each subscription
+                # FIXME: Allow subscriptions on the same socket
+                websocket_client = self._websocket_client_class()
                 subscription = websocket_client.listen(symbol, channel)
             else:
-                raise ValueError('websocket_client is None')
+                raise ValueError('No listen() method found.')
             subscriptions[subscription.market_name] = subscription
         return subscriptions
 
@@ -138,6 +143,64 @@ class RestClient(abc.ABC):
 
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
+
+    def listen(self, symbol, feed, interval=1.0):
+        logger.info(f'Subscribing to {self.exchange}--{symbol} ...')
+        # timer
+
+        # FIXME: get the symbol properly
+        # application
+        def get_raw_ticker():
+            msg = feed.get_tickers(symbol[:3], symbol[3:])
+            packet = json.dumps(msg)
+            return packet
+
+        channel_info = {'channel': 'ticker'}
+        subscription = Subscription(exchange=self.exchange, 
+                                    symbol=symbol,
+                                    channel='ticker',
+                                    channel_info=channel_info, 
+                                    client=self,
+                                    listener=None,
+                                    handlers=[],
+                                    )
+        # FIXME: find a better way to do this
+        subscription.listener = self._listener(subscription, interval=interval,
+                                               callback=get_raw_ticker)
+
+        # Install the raw_stream packet handler
+        subscription.raw_stream.sink(
+            partial(self.handle_ticker, subscription=subscription))
+        logger.info(f'Subscribed to {self.exchange}--{symbol}.')
+        return subscription
+
+    @staticmethod
+    def handle_ticker(packet, subscription):
+        # FIXME: implement this
+        msg = json.loads(packet)
+        subscription.event_stream.emit(msg)
+
+    async def _listener(self, subscription, interval, callback):
+        while True:
+            try:
+                # FIXME: This should use an async requester as below
+                packet = callback()
+                subscription.raw_stream.emit(packet)
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                ## unsubscribe
+                confirmation = \
+                    await asyncio.shield(self._unsubscribe(subscription))
+            except Exception as ex:
+                logger.error(ex)
+                logger.error(packet)
+                raise
+
+    async def _subscribe(self, subscription):
+        pass
+
+    async def _unsubscribe(self, subscription):
+        pass
 
     @requester.validator
     def __requester_validator(self, attribute, value):
