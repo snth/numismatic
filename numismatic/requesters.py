@@ -7,6 +7,9 @@ import gzip
 from urllib.parse import urlparse, urlencode
 import pickle
 
+import attr
+from appdirs import user_cache_dir
+
 
 log = logging.getLogger(__name__)
 
@@ -14,34 +17,35 @@ log = logging.getLogger(__name__)
 LIBRARY_NAME = 'numismatic'
 
 
+@attr.s
 class Requester:
     "Basic Requester using requests and blocking calls"
 
     @classmethod
-    def factory(cls, requester, **kwds):
+    def factory(cls, requester, **kwargs):
         requester = '' if requester is None else requester.lower()
+        # FIXME: use the subclass method used in Feed and Collector
         if requester in {'', 'base', 'basic'}:
-            return Requester(**kwds)
+            subcls = Requester
         elif requester in {'caching'}:
-            return CachingRequester(**kwds)
+            subcls = CachingRequester
         else:
             raise NotImplementedError(f'requester={requester}')
-
-    def __init__(self, **kwds):
-        pass
+        kwds = {field.name:kwargs[field.name] for field in
+                attr.fields(subcls) if field.name in kwargs}
+        return subcls(**kwds)
 
     def get(self, url, params=None, headers=None):
         response = requests.get(url, params=params, headers=headers)
         return response
 
 
+@attr.s
 class CachingRequester(Requester):
 
-    def __init__(self, cache_dir, **kwds):
-        if cache_dir is None:
-            from appdirs import user_cache_dir
-            cache_dir = user_cache_dir(LIBRARY_NAME)
-        self.cache_dir = Path(cache_dir)
+    cache_dir = \
+        attr.ib(default=attr.Factory(partial(user_cache_dir, LIBRARY_NAME)),
+                convert=Path)
 
     def _get_path(self, url, params=None):
         parts = urlparse(url)

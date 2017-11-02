@@ -58,18 +58,20 @@ class Feed(abc.ABC, ConfigMixin):
 
     rest_client = attr.ib(default=None)
     websocket_client = attr.ib(default=None)
+    cache_dir = attr.ib(default=None)
+    requester = attr.ib(default='base')
+    websocket = attr.ib(default=None)
 
-    def __init__(self, **kwargs):
+    @rest_client.validator
+    def _rest_client_validator(self, attribute, value):
         self.rest_client = None if self._rest_client_class is None else \
-            self._rest_client_class(
-                **{a.name:kwargs[a.name] for a in 
-                   attr.fields(self._rest_client_class)
-                   if a.name in kwargs})
+            self._rest_client_class(cache_dir=self.cache_dir,
+                                    requester=self.requester)
+
+    @websocket_client.validator
+    def _websocket_client_validator(self, attribute, value):
         self.websocket_client = None if self._websocket_client_class is None \
-            else self._websocket_client_class(
-                **{a.name:kwargs[a.name] for a in 
-                   attr.fields(self._websocket_client_class)
-                   if a.name in kwargs})
+            else self._websocket_client_class(websocket=self.websocket)
         
     @staticmethod
     def get_symbol(asset, currency):
@@ -85,6 +87,10 @@ class Feed(abc.ABC, ConfigMixin):
 
     @abc.abstractmethod
     def get_prices(self, assets, currencies):
+        return
+
+    @abc.abstractmethod
+    def get_tickers(self, asset, currency):
         return
 
     @classmethod
@@ -110,8 +116,8 @@ class Feed(abc.ABC, ConfigMixin):
         if not value:
             # value = self.config[parameter]
             value = cls.get_config_item(parameter)
-        return value.split(',') if isinstance(value, str) else \
-            ','.join(value).split(',')
+        value_str = value if isinstance(value, str) else ','.join(value)
+        return value_str.upper().split(',')
 
     def __getattr__(self, attr):
         if self.rest_client is not None and hasattr(self.rest_client, attr):
@@ -133,10 +139,6 @@ class RestClient(abc.ABC):
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
 
-    @abc.abstractmethod
-    def get_ticker(self, asset, currency):
-        return
-
     @requester.validator
     def __requester_validator(self, attribute, value):
         if isinstance(value, str):
@@ -145,9 +147,12 @@ class RestClient(abc.ABC):
         elif not isinstance(value, Requester):
             raise ValueError(f'{attribute.name}: {value}')
 
-    def _make_request(self, api_url, params=None, headers=None):
+    def _make_request(self, api_url, params=None, headers=None, raw=False):
         response = self.requester.get(api_url, params=params, headers=headers)
-        data = response.json()
+        if not raw:
+            data = response.json()
+        else:
+            data = response
         return data
 
 

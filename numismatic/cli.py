@@ -115,6 +115,23 @@ def prices(state, feed, assets, currencies, output):
 @coin.command()
 @click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
               type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--assets', '-a', multiple=True,
+              envvar=f'{ENVVAR_PREFIX}_ASSETS')
+@click.option('--currencies', '-c', multiple=True,
+              envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
+@click.option('--output', '-o', type=click.File('wt'), default='-')
+@pass_state
+def tickers(state, feed, assets, currencies, output):
+    'Latest asset tickers'
+    feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
+                               requester=state['requester'])
+    tickers = feed_client.get_tickers(assets=assets, currencies=currencies)
+    write(tickers, output)
+
+
+@coin.command()
+@click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
+              type=click.Choice(Feed._get_subclasses().keys()))
 @click.option('--freq', default='d', type=click.Choice(list('dhms')))
 @click.option('--start-date', '-s', default=-30)
 @click.option('--end-date', '-e', default=None)

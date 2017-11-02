@@ -47,13 +47,10 @@ class CryptoCompareRestClient(RestClient):
         return self._make_request(api_url, params)
 
     # FIXME: rename to get_price_multi_full
-    def get_price_multi_full(self, fsyms, tsyms):
+    def get_price_multi_full(self, fsyms, tsyms, raw=False):
         api_url = f'{self.api_url}/pricemultifull'
         params = dict(fsyms=make_list_str(fsyms), tsyms=make_list_str(tsyms))
-        return self._make_request(api_url, params)
-
-    def get_ticker(self, symbol):
-        return self.get_price_multi_full(symbol[:3], symbol[3:])
+        return self._make_request(api_url, params, raw=raw)
 
     def get_historical_price(self, fsym, tsyms, ts, markets=None):
         api_url = f'{self.api_url}/pricehistorical'
@@ -77,13 +74,14 @@ class CryptoCompareRestClient(RestClient):
         params = dict(fsym=fsym, tsym=tsym, e=e, limit=limit, toTs=toTs)
         return self._make_request(api_url, params)
 
-    def _make_request(self, api_url, params=None):
-        data = super()._make_request(api_url, params)
-        if 'Data' in data:
+    def _make_request(self, api_url, params=None, raw=False):
+        data = super()._make_request(api_url, params, raw=raw)
+        if 'Data' in data and not raw:
             data = data['Data']
         return data
 
 
+@attr.s
 class CryptoCompareFeed(Feed):
 
     _interval_limit = 2000
@@ -108,6 +106,27 @@ class CryptoCompareFeed(Feed):
                   for asset, asset_prices in data.items()
                   for currency, price in asset_prices.items()]
         return prices
+
+    def get_tickers(self, assets, currencies):
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
+        # FIXME: SHouldn't use caching
+        data = self.rest_client.get_price_multi_full(assets, currencies)
+        output = []
+        try:
+            for _asset in data['RAW']:
+                for _currency in data['RAW'][_asset]:
+                    record = data['RAW'][_asset][_currency]
+                    record.update(dict(_asset=_asset, _currency=_currency))
+                    output.append(record)
+        except Exception as ex:
+            logger.error(ex)
+            print(data)
+        return output
+        # tickers = [{'asset':asset, 'currency':currency, 'price':price}
+        #           for asset, asset_prices in data.items()
+        #           for currency, price in asset_prices.items()]
+        # return tickers
 
     def get_historical_data(self, assets, currencies, freq='d', end_date=None,
                             start_date=-30, exchange=None):
