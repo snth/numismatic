@@ -45,10 +45,14 @@ def coin(state, cache_dir, requester, log_level):
         coin prices
 
         coin prices -a XMR,ZEC -c EUR,ZAR
+        
+        coin prices --raw
 
         coin prices -f luno
 
         coin tickers -f cryptocompare
+
+        coin tickers -f cryptocompare --raw
 
         coin history
 
@@ -104,13 +108,15 @@ def info(state, feed, assets, output):
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
+@click.option('--raw', is_flag=True)
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def prices(state, feed, assets, currencies, output):
+def prices(state, feed, assets, currencies, raw, output):
     'Latest asset prices'
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
-    prices = feed_client.get_prices(assets=assets, currencies=currencies)
+    prices = feed_client.get_prices(assets=assets, currencies=currencies,
+                                    raw=raw)
     write(prices, output)
 
 
@@ -121,13 +127,15 @@ def prices(state, feed, assets, currencies, output):
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
+@click.option('--raw', is_flag=True)
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def tickers(state, feed, assets, currencies, output):
+def tickers(state, feed, assets, currencies, raw, output):
     'Latest asset tickers'
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
-    tickers = feed_client.get_tickers(assets=assets, currencies=currencies)
+    tickers = feed_client.get_tickers(assets=assets, currencies=currencies,
+                                      raw=raw)
     write(tickers, output)
 
 

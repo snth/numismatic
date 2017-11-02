@@ -86,11 +86,11 @@ class Feed(abc.ABC, ConfigMixin):
         return
 
     @abc.abstractmethod
-    def get_prices(self, assets, currencies):
+    def get_prices(self, assets, currencies, raw=False):
         return
 
     @abc.abstractmethod
-    def get_tickers(self, assets, currencies):
+    def get_tickers(self, assets, currencies, raw=False):
         return
 
     @classmethod
