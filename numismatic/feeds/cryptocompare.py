@@ -9,6 +9,7 @@ from itertools import product
 import attr
 
 from .base import Feed, RestClient
+from ..events import Ticker
 from ..libs.utils import date_range, make_list_str, to_datetime, \
     dates_and_frequencies
 
@@ -107,7 +108,7 @@ class CryptoCompareFeed(Feed):
                   for currency, price in asset_prices.items()]
         return prices
 
-    def get_tickers(self, assets, currencies):
+    def get_tickers(self, assets, currencies, raw=False):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         # FIXME: SHouldn't use caching
@@ -116,9 +117,22 @@ class CryptoCompareFeed(Feed):
         try:
             for _asset in data['RAW']:
                 for _currency in data['RAW'][_asset]:
-                    record = data['RAW'][_asset][_currency]
-                    record.update(dict(_asset=_asset, _currency=_currency))
-                    output.append(record)
+                    msg = data['RAW'][_asset][_currency]
+                    msg.update(dict(_asset=_asset, _currency=_currency))
+                    if not raw:
+                        symbol = msg['FROMSYMBOL']+msg['TOSYMBOL']
+                        event = Ticker(exchange=msg['MARKET'],
+                                       symbol=symbol,
+                                       price=msg['PRICE'],
+                                       volume_24h=msg['VOLUME24HOUR'],
+                                       value_24h=msg['VOLUME24HOURTO'],
+                                       open_24h=msg['OPEN24HOUR'],
+                                       high_24h=msg['HIGH24HOUR'],
+                                       low_24h=msg['LOW24HOUR'],)
+                        output.append(event)
+                    else:
+                        output.append(msg)
+
         except Exception as ex:
             logger.error(ex)
             print(data)

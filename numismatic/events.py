@@ -32,6 +32,7 @@ class Heartbeat(Event):
 @attr.s(slots=True)
 class PriceUpdate(Event):
     exchange = attr.ib(convert=str)
+    # FIXME: symbol should be split into asset and currency
     symbol = attr.ib(convert=str)
     price = attr.ib(convert=float)
 
@@ -40,6 +41,7 @@ class Ticker(PriceUpdate):
     best_bid = attr.ib(convert=float, default=math.nan)
     best_ask = attr.ib(convert=float, default=math.nan)
     volume_24h = attr.ib(convert=float, default=math.nan)
+    value_24h = attr.ib(convert=float, default=math.nan)
     open_24h = attr.ib(convert=float, default=math.nan)
     high_24h = attr.ib(convert=float, default=math.nan)
     low_24h = attr.ib(convert=float, default=math.nan)
