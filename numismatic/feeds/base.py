@@ -54,7 +54,7 @@ class Feed(abc.ABC, ConfigMixin):
     "Feed Base class"
 
     _rest_client_class = None
-    _websockt_client_class = None
+    _websocket_client_class = None
 
     rest_client = attr.ib(default=None)
     websocket_client = attr.ib(default=None)
@@ -132,6 +132,10 @@ class RestClient(abc.ABC):
 
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
+
+    @abc.abstractmethod
+    def get_ticker(self, asset, currency):
+        return
 
     @requester.validator
     def __requester_validator(self, attribute, value):

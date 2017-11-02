@@ -24,6 +24,7 @@ class CryptoCompareRestClient(RestClient):
       * This should use the json api to automatically generate the methods
     '''
 
+    exchange = 'CryptoCompare'
     base_url = 'https://www.cryptocompare.com/api/data/'
     api_url = 'https://min-api.cryptocompare.com/data'
 
@@ -32,16 +33,27 @@ class CryptoCompareRestClient(RestClient):
         coinlist = self._make_request(api_url)
         return coinlist
 
+    # FIXME: rename to get_price
     def get_latest_price(self, fsym, tsyms):
         api_url = f'{self.api_url}/price'
         tsyms = make_list_str(tsyms)
         query_str = f'{api_call}?fsym={fsym}&tsyms={tsyms}'
         return self._make_request(api_url, query_str)
 
+    # FIXME: rename to get_price_multi
     def get_latest_price_multi(self, fsyms, tsyms):
         api_url = f'{self.api_url}/pricemulti'
         params = dict(fsyms=make_list_str(fsyms), tsyms=make_list_str(tsyms))
         return self._make_request(api_url, params)
+
+    # FIXME: rename to get_price_multi_full
+    def get_price_multi_full(self, fsyms, tsyms):
+        api_url = f'{self.api_url}/pricemultifull'
+        params = dict(fsyms=make_list_str(fsyms), tsyms=make_list_str(tsyms))
+        return self._make_request(api_url, params)
+
+    def get_ticker(self, symbol):
+        return self.get_price_multi_full(symbol[:3], symbol[3:])
 
     def get_historical_price(self, fsym, tsyms, ts, markets=None):
         api_url = f'{self.api_url}/pricehistorical'
