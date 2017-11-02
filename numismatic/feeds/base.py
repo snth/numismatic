@@ -90,7 +90,7 @@ class Feed(abc.ABC, ConfigMixin):
         return
 
     @abc.abstractmethod
-    def get_tickers(self, asset, currency):
+    def get_tickers(self, assets, currencies):
         return
 
     @classmethod
