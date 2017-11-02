@@ -67,6 +67,8 @@ def coin(state, cache_dir, requester, log_level):
         coin listen -f bitfinex -f gdax collect --raw run
 
         coin listen -f bitfinex -f gdax compare run
+
+        coin listen -f cryptocompare collect --raw run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
