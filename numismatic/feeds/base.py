@@ -14,6 +14,7 @@ import websockets
 
 from ..requesters import Requester
 from ..config import ConfigMixin
+from ..events import Event
 
 logger = logging.getLogger(__name__)
 
@@ -101,10 +102,9 @@ class Feed(abc.ABC, ConfigMixin):
         for symbol, channel in product(self._get_pairs(assets, currencies),
                                        channels):
             if self._rest_client_class is not None:
-                # Creates a new websocket_client for each subscription
-                # FIXME: Allow subscriptions on the same socket
+                channel_method = getattr(self, f'get_{channel.lower()}')
                 rest_client = self._rest_client_class()
-                subscription = rest_client.listen(symbol, self,
+                subscription = rest_client.listen(symbol, channel_method,
                                                   interval=interval)
             elif self._websocket_client_class is not None:
                 # Creates a new websocket_client for each subscription
@@ -144,41 +144,60 @@ class RestClient(abc.ABC):
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
 
-    def listen(self, symbol, feed, interval=1.0):
-        logger.info(f'Subscribing to {self.exchange}--{symbol} ...')
+    def listen(self, symbol, channel, interval=1.0):
+        channel_name = f'{self.exchange}--{symbol}--{channel.__name__}'
+        logger.info(f'Subscribing to {channel_name} ...')
         # timer
 
         # FIXME: get the symbol properly
         # application
-        def get_raw_ticker():
-            msg = feed.get_tickers(symbol[:3], symbol[3:])
-            packet = json.dumps(msg)
+        def _get_raw_channel():
+            messages = channel(symbol[:3], symbol[3:], raw=True)
+            packet = '\n'.join(json.dumps(msg) for msg in messages)
             return packet
 
-        channel_info = {'channel': 'ticker'}
+        channel_info = {'channel': channel.__name__}
         subscription = Subscription(exchange=self.exchange, 
                                     symbol=symbol,
                                     channel='ticker',
                                     channel_info=channel_info, 
                                     client=self,
                                     listener=None,
-                                    handlers=[],
+                                    handlers=self._get_handlers(),
                                     )
         # FIXME: find a better way to do this
         subscription.listener = self._listener(subscription, interval=interval,
-                                               callback=get_raw_ticker)
+                                               callback=_get_raw_channel)
 
         # Install the raw_stream packet handler
         subscription.raw_stream.sink(
-            partial(self.handle_ticker, subscription=subscription))
-        logger.info(f'Subscribed to {self.exchange}--{symbol}.')
+            partial(self.__handle_packet, subscription=subscription))
+        logger.info(f'Subscribed to {channel_name} ...')
         return subscription
+             
 
     @staticmethod
-    def handle_ticker(packet, subscription):
-        # FIXME: implement this
-        msg = json.loads(packet)
-        subscription.event_stream.emit(msg)
+    def __handle_packet(packet, subscription):
+        # most of the time we get json so only decode that once
+        try:
+            msg = json.loads(packet)
+        except:
+            msg = packet
+            raise
+        if not msg:
+            return
+        for handler in subscription.handlers:
+            result = handler(msg)
+            if isinstance(result, Event):
+                subscription.event_stream.emit(result)
+            elif result is STOP_HANDLERS:
+                break
+
+    @classmethod
+    def _get_handlers(cls):
+        return [getattr(cls, attr) for attr in dir(cls)
+                if callable(getattr(cls, attr)) 
+                and attr.startswith('parse_')]
 
     async def _listener(self, subscription, interval, callback):
         while True:
