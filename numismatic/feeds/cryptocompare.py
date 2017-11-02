@@ -17,6 +17,16 @@ from ..libs.utils import date_range, make_list_str, to_datetime, \
 logger = logging.getLogger(__name__)
 
 
+EXCHANGES = ('BTC38,BTCC,BTCE,BTER,Bit2C,Bitfinex,Bitstamp,Bittrex,CCEDK,'
+             'Cexio,Coinbase,Coinfloor,Coinse,Coinsetter,Cryptopia,Cryptsy,'
+             'Gatecoin,Gemini,HitBTC,Huobi,itBit,Kraken,LakeBTC,LocalBitcoins,'
+             'MonetaGo,OKCoin,Poloniex,Yacuna,Yunbi,Yobit,Korbit,BitBay,'
+             'BTCMarkets,QuadrigaCX,CoinCheck,BitSquare,Vaultoro,'
+             'MercadoBitcoin,Unocoin,Bitso,BTCXIndia,Paymium,TheRockTrading,'
+             'bitFlyer,Quoine,Luno,EtherDelta,Liqui,bitFlyerFX,BitMarket,'
+             'LiveCoin,Coinone,Tidex,Bleutrade,EthexIndia'
+             ).split(',')
+
 @attr.s
 class CryptoCompareRestClient(RestClient):
     '''Low level API for CryptoCompare.com
@@ -34,26 +44,25 @@ class CryptoCompareRestClient(RestClient):
         coinlist = self._make_request(api_url)
         return coinlist
 
-    # FIXME: rename to get_price
-    def get_latest_price(self, fsym, tsyms):
+    def get_price(self, fsym, tsyms, e=None):
         api_url = f'{self.api_url}/price'
         tsyms = make_list_str(tsyms)
         query_str = f'{api_call}?fsym={fsym}&tsyms={tsyms}'
         return self._make_request(api_url, query_str)
 
-    # FIXME: rename to get_price_multi
-    def get_latest_price_multi(self, fsyms, tsyms):
+    def get_price_multi(self, fsyms, tsyms, e=None):
         api_url = f'{self.api_url}/pricemulti'
-        params = dict(fsyms=make_list_str(fsyms), tsyms=make_list_str(tsyms))
+        params = dict(fsyms=make_list_str(fsyms), tsyms=make_list_str(tsyms),
+                      e=e)
         return self._make_request(api_url, params)
 
-    # FIXME: rename to get_price_multi_full
-    def get_price_multi_full(self, fsyms, tsyms, raw=False):
+    def get_price_multi_full(self, fsyms, tsyms, e=None, raw=False):
         api_url = f'{self.api_url}/pricemultifull'
-        params = dict(fsyms=make_list_str(fsyms), tsyms=make_list_str(tsyms))
+        params = dict(fsyms=make_list_str(fsyms), tsyms=make_list_str(tsyms),
+                      e=e)
         return self._make_request(api_url, params, raw=raw)
 
-    def get_historical_price(self, fsym, tsyms, ts, markets=None):
+    def get_price_historical(self, fsym, tsyms, ts, markets=None):
         api_url = f'{self.api_url}/pricehistorical'
         tsyms = make_list_str(tsyms)
         params = dict(fsym=fsym, tsyms=tsyms, ts=ts, markets=markets)
@@ -83,9 +92,9 @@ class CryptoCompareRestClient(RestClient):
 
     @staticmethod
     def parse_price(msg):
-        if isinstance(msg, dict) and len(msg)==3 and \
-                set(msg)=={'asset', 'currency', 'price'}:
-            event = PriceUpdate(exchange='CryptoCompare',
+        if isinstance(msg, dict) and \
+                set(msg)=={'exchange', 'asset', 'currency', 'price'}:
+            event = PriceUpdate(exchange=msg['exchange'],
                                 symbol=msg['asset']+msg['currency'],
                                 price=msg['price'])
             return event
@@ -123,23 +132,28 @@ class CryptoCompareFeed(Feed):
         assets_info = [coinlist[a] for a in assets]
         return assets_info
 
-    def get_prices(self, assets, currencies, raw=False):
+    def get_prices(self, assets, currencies, exchange=None, raw=False):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         # FIXME: SHouldn't use caching
-        data = self.rest_client.get_latest_price_multi(assets, currencies)
-        prices = [{'asset':asset, 'currency':currency, 'price':price}
+        data = self.rest_client.get_price_multi(fsyms=assets, tsyms=currencies,
+                                                e=exchange)
+        exchange = exchange if exchange else self.rest_client.exchange
+        prices = [{'exchange':exchange, 'asset':asset, 'currency':currency,
+                   'price':price, }
                   for asset, asset_prices in data.items()
                   for currency, price in asset_prices.items()]
         if not raw:
             prices = [self.rest_client.parse_price(msg) for msg in prices]
         return prices
 
-    def get_tickers(self, assets, currencies, raw=False):
+    def get_tickers(self, assets, currencies, exchange=None, raw=False):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         # FIXME: SHouldn't use caching
-        data = self.rest_client.get_price_multi_full(assets, currencies)
+        data = self.rest_client.get_price_multi_full(fsyms=assets,
+                                                     tsyms=currencies,
+                                                     e=exchange)
         tickers = [msg if raw else self.rest_client.parse_ticker(msg)
                   for asset, asset_updates in data['RAW'].items()
                   for currency, msg in asset_updates.items()]
