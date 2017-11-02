@@ -81,6 +81,31 @@ class CryptoCompareRestClient(RestClient):
             data = data['Data']
         return data
 
+    @staticmethod
+    def parse_price(msg):
+        if isinstance(msg, dict) and len(msg)==3 and \
+                set(msg)=={'asset', 'currency', 'price'}:
+            event = PriceUpdate(exchange='CryptoCompare',
+                                symbol=msg['asset']+msg['currency'],
+                                price=msg['price'])
+            return event
+
+    @staticmethod
+    def parse_ticker(msg):
+        if isinstance(msg, dict) and \
+                {'PRICE', 'VOLUME24HOUR', 'VOLUME24HOURTO', 'OPEN24HOUR',
+                 'HIGH24HOUR', 'LOW24HOUR'} <= set(msg):
+            symbol = msg['FROMSYMBOL']+msg['TOSYMBOL']
+            event = Ticker(exchange=msg['MARKET'],
+                        symbol=symbol, price=msg['PRICE'],
+                        volume_24h=msg['VOLUME24HOUR'],
+                        value_24h=msg['VOLUME24HOURTO'],
+                        open_24h=msg['OPEN24HOUR'],
+                        high_24h=msg['HIGH24HOUR'],
+                        low_24h=msg['LOW24HOUR'],
+                        )
+            return event
+
 
 @attr.s
 class CryptoCompareFeed(Feed):
@@ -107,43 +132,18 @@ class CryptoCompareFeed(Feed):
                   for asset, asset_prices in data.items()
                   for currency, price in asset_prices.items()]
         if not raw:
-            prices = [self.parse_price(msg) for msg in prices]
+            prices = [self.rest_client.parse_price(msg) for msg in prices]
         return prices
-
-    @staticmethod
-    def parse_price(msg):
-        if isinstance(msg, dict) and len(msg)==3 and \
-                set(msg)=={'asset', 'currency', 'price'}:
-            event = PriceUpdate(exchange='CryptoCompare',
-                                symbol=msg['asset']+msg['currency'],
-                                price=msg['price'])
-            return event
 
     def get_tickers(self, assets, currencies, raw=False):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         # FIXME: SHouldn't use caching
         data = self.rest_client.get_price_multi_full(assets, currencies)
-        tickers = [msg if raw else self.parse_ticker(msg)
+        tickers = [msg if raw else self.rest_client.parse_ticker(msg)
                   for asset, asset_updates in data['RAW'].items()
                   for currency, msg in asset_updates.items()]
         return tickers
-
-    @staticmethod
-    def parse_ticker(msg):
-        if isinstance(msg, dict) and \
-                {'PRICE', 'VOLUME24HOUR', 'VOLUME24HOURTO', 'OPEN24HOUR',
-                 'HIGH24HOUR', 'LOW24HOUR'} <= set(msg):
-            symbol = msg['FROMSYMBOL']+msg['TOSYMBOL']
-            event = Ticker(exchange=msg['MARKET'],
-                        symbol=symbol, price=msg['PRICE'],
-                        volume_24h=msg['VOLUME24HOUR'],
-                        value_24h=msg['VOLUME24HOURTO'],
-                        open_24h=msg['OPEN24HOUR'],
-                        high_24h=msg['HIGH24HOUR'],
-                        low_24h=msg['LOW24HOUR'],
-                        )
-            return event
 
     def get_historical_data(self, assets, currencies, freq='d', end_date=None,
                             start_date=-30, exchange=None):
