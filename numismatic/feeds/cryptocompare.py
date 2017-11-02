@@ -35,7 +35,7 @@ class CryptoCompareRestClient(RestClient):
       * This should use the json api to automatically generate the methods
     '''
 
-    exchange = 'CryptoCompare'
+    exchange = 'CCCAGG'
     base_url = 'https://www.cryptocompare.com/api/data/'
     api_url = 'https://min-api.cryptocompare.com/data'
 

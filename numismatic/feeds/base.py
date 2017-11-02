@@ -94,7 +94,8 @@ class Feed(abc.ABC, ConfigMixin):
     def get_tickers(self, assets, currencies, raw=False):
         return
 
-    def subscribe(self, assets, currencies, channels, interval=1.0):
+    def subscribe(self, assets, currencies, channels, exchange=None,
+                  interval=1.0):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         channels = self._validate_parameter('channels', channels)
@@ -105,7 +106,8 @@ class Feed(abc.ABC, ConfigMixin):
                 channel_method = getattr(self, f'get_{channel.lower()}')
                 rest_client = self._rest_client_class()
                 subscription = rest_client.listen(symbol, channel_method,
-                                                  interval=interval)
+                                                  interval=interval,
+                                                  exchange=exchange)
             elif self._websocket_client_class is not None:
                 # Creates a new websocket_client for each subscription
                 # FIXME: Allow subscriptions on the same socket
@@ -144,20 +146,22 @@ class RestClient(abc.ABC):
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
 
-    def listen(self, symbol, channel, interval=1.0):
-        channel_name = f'{self.exchange}--{symbol}--{channel.__name__}'
+    def listen(self, symbol, channel, interval=1.0, exchange=None):
+        exchange = exchange if exchange else self.exchange
+        channel_name = f'{exchange}--{symbol}--{channel.__name__}'
         logger.info(f'Subscribing to {channel_name} ...')
         # timer
 
         # FIXME: get the symbol properly
         # application
         def _get_raw_channel():
-            messages = channel(symbol[:3], symbol[3:], raw=True)
+            messages = channel(symbol[:3], symbol[3:], exchange=exchange,
+                               raw=True)
             packet = '\n'.join(json.dumps(msg) for msg in messages)
             return packet
 
         channel_info = {'channel': channel.__name__}
-        subscription = Subscription(exchange=self.exchange, 
+        subscription = Subscription(exchange=exchange,
                                     symbol=symbol,
                                     channel='ticker',
                                     channel_info=channel_info, 

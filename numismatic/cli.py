@@ -159,7 +159,6 @@ def tickers(state, feed, exchange, assets, currencies, raw, output):
 def history(state, feed, exchange, assets, currencies, freq, start_date,
             end_date, output):
     'Historic asset prices and volumes'
-    # FIXME: move the loop below into the Feed class
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
     data = feed_client.get_historical_data(assets, currencies, freq=freq,
@@ -186,26 +185,20 @@ def tabulate(data):
 @coin.command()
 @click.option('--feed', '-f', default='bitfinex',
               type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--exchange', '-e', default=None)
 @click.option('--assets', '-a', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
-@click.option('--raw-output', '-r', default=None, help="Path to write raw "
-              "stream to")
-@click.option('--raw-interval', '-i', default=1, 
-              type=float, help="The interval between writing the raw stream "
-              "to disk")
-# FIXME: The --channel and --api-key-* options are Feed specific and 
-#        should probably be handled differently.
+@click.option('--interval', '-i', default=1.0, type=float,
+              help='Interval between requests for RestClient subscriptions')
 @click.option('--channels', '-C', multiple=True)
-@click.option('--api-key-id', default=None)
-@click.option('--api-key-secret', default=None)
 @pass_state
-def listen(state, feed, assets, currencies, raw_output, raw_interval, 
-           channels, api_key_id, api_key_secret):
+def listen(state, feed, exchange, assets, currencies, interval, channels):
     'Listen to live events from a feed'
     feed_client = Feed.factory(feed) 
-    subscriptions = feed_client.subscribe(assets, currencies, channels)
+    subscriptions = feed_client.subscribe(assets, currencies, channels,
+                                          exchange=exchange, interval=interval)
     state['subscriptions'].update(subscriptions)
 
 
