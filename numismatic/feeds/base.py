@@ -14,6 +14,7 @@ import websockets
 
 from ..requesters import Requester
 from ..config import ConfigMixin
+from ..events import Event
 
 logger = logging.getLogger(__name__)
 
@@ -93,21 +94,27 @@ class Feed(abc.ABC, ConfigMixin):
     def get_tickers(self, assets, currencies, raw=False):
         return
 
-    @classmethod
-    def subscribe(cls, assets, currencies, channels):
-        assets = cls._validate_parameter('assets', assets)
-        currencies = cls._validate_parameter('currencies', currencies)
-        channels = cls._validate_parameter('channels', channels)
+    def subscribe(self, assets, currencies, channels, exchange=None,
+                  interval=1.0):
+        assets = self._validate_parameter('assets', assets)
+        currencies = self._validate_parameter('currencies', currencies)
+        channels = self._validate_parameter('channels', channels)
         subscriptions = {}
-        for symbol, channel in product(cls._get_pairs(assets, currencies),
+        for symbol, channel in product(self._get_pairs(assets, currencies),
                                        channels):
-            if cls._websocket_client_class is not None:
+            if self._rest_client_class is not None:
+                channel_method = getattr(self, f'get_{channel.lower()}')
+                rest_client = self._rest_client_class()
+                subscription = rest_client.listen(symbol, channel_method,
+                                                  interval=interval,
+                                                  exchange=exchange)
+            elif self._websocket_client_class is not None:
                 # Creates a new websocket_client for each subscription
                 # FIXME: Allow subscriptions on the same socket
-                websocket_client = cls._websocket_client_class()
+                websocket_client = self._websocket_client_class()
                 subscription = websocket_client.listen(symbol, channel)
             else:
-                raise ValueError('websocket_client is None')
+                raise ValueError('No listen() method found.')
             subscriptions[subscription.market_name] = subscription
         return subscriptions
 
@@ -138,6 +145,85 @@ class RestClient(abc.ABC):
 
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
+
+    def listen(self, symbol, channel, interval=1.0, exchange=None):
+        exchange = exchange if exchange else self.exchange
+        channel_name = f'{exchange}--{symbol}--{channel.__name__}'
+        logger.info(f'Subscribing to {channel_name} ...')
+        # timer
+
+        # FIXME: get the symbol properly
+        # application
+        def _get_raw_channel():
+            messages = channel(symbol[:3], symbol[3:], exchange=exchange,
+                               raw=True)
+            packet = '\n'.join(json.dumps(msg) for msg in messages)
+            return packet
+
+        channel_info = {'channel': channel.__name__}
+        subscription = Subscription(exchange=exchange,
+                                    symbol=symbol,
+                                    channel='ticker',
+                                    channel_info=channel_info, 
+                                    client=self,
+                                    listener=None,
+                                    handlers=self._get_handlers(),
+                                    )
+        # FIXME: find a better way to do this
+        subscription.listener = self._listener(subscription, interval=interval,
+                                               callback=_get_raw_channel)
+
+        # Install the raw_stream packet handler
+        subscription.raw_stream.sink(
+            partial(self.__handle_packet, subscription=subscription))
+        logger.info(f'Subscribed to {channel_name} ...')
+        return subscription
+             
+
+    @staticmethod
+    def __handle_packet(packet, subscription):
+        # most of the time we get json so only decode that once
+        try:
+            msg = json.loads(packet)
+        except:
+            msg = packet
+            raise
+        if not msg:
+            return
+        for handler in subscription.handlers:
+            result = handler(msg)
+            if isinstance(result, Event):
+                subscription.event_stream.emit(result)
+            elif result is STOP_HANDLERS:
+                break
+
+    @classmethod
+    def _get_handlers(cls):
+        return [getattr(cls, attr) for attr in dir(cls)
+                if callable(getattr(cls, attr)) 
+                and attr.startswith('parse_')]
+
+    async def _listener(self, subscription, interval, callback):
+        while True:
+            try:
+                # FIXME: This should use an async requester as below
+                packet = callback()
+                subscription.raw_stream.emit(packet)
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                ## unsubscribe
+                confirmation = \
+                    await asyncio.shield(self._unsubscribe(subscription))
+            except Exception as ex:
+                logger.error(ex)
+                logger.error(packet)
+                raise
+
+    async def _subscribe(self, subscription):
+        pass
+
+    async def _unsubscribe(self, subscription):
+        pass
 
     @requester.validator
     def __requester_validator(self, attribute, value):

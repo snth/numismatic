@@ -8,7 +8,7 @@ from tornado.platform.asyncio import AsyncIOMainLoop
 from streamz import Stream, union, combine_latest, zip_latest
 import attr
 
-from .events import Trade
+from .events import PriceUpdate
 from .collectors import Collector
 from .feeds import Feed
 from .config import config
@@ -66,7 +66,15 @@ def coin(state, cache_dir, requester, log_level):
 
         coin listen -f bitfinex -f gdax collect --raw run
 
+        coin listen -f cryptocompare collect run
+
+        coin listen -f cryptocompare -e kraken collect run
+
         coin listen -f bitfinex -f gdax compare run
+
+        coin listen -f cryptocompare -C tickers -e cexio listen -f \\
+            cryptocompare -C prices -e kraken listen -f bitfinex compare \\
+            run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
@@ -157,7 +165,6 @@ def tickers(state, feed, exchange, assets, currencies, raw, output):
 def history(state, feed, exchange, assets, currencies, freq, start_date,
             end_date, output):
     'Historic asset prices and volumes'
-    # FIXME: move the loop below into the Feed class
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
     data = feed_client.get_historical_data(assets, currencies, freq=freq,
@@ -184,26 +191,20 @@ def tabulate(data):
 @coin.command()
 @click.option('--feed', '-f', default='bitfinex',
               type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--exchange', '-e', default=None)
 @click.option('--assets', '-a', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
-@click.option('--raw-output', '-r', default=None, help="Path to write raw "
-              "stream to")
-@click.option('--raw-interval', '-i', default=1, 
-              type=float, help="The interval between writing the raw stream "
-              "to disk")
-# FIXME: The --channel and --api-key-* options are Feed specific and 
-#        should probably be handled differently.
+@click.option('--interval', '-i', default=1.0, type=float,
+              help='Interval between requests for RestClient subscriptions')
 @click.option('--channels', '-C', multiple=True)
-@click.option('--api-key-id', default=None)
-@click.option('--api-key-secret', default=None)
 @pass_state
-def listen(state, feed, assets, currencies, raw_output, raw_interval, 
-           channels, api_key_id, api_key_secret):
+def listen(state, feed, exchange, assets, currencies, interval, channels):
     'Listen to live events from a feed'
     feed_client = Feed.factory(feed) 
-    subscriptions = feed_client.subscribe(assets, currencies, channels)
+    subscriptions = feed_client.subscribe(assets, currencies, channels,
+                                          exchange=exchange, interval=interval)
     state['subscriptions'].update(subscriptions)
 
 
@@ -252,7 +253,7 @@ def collect(state, market, stream, collector, filter, type, output, format, inte
 def compare(state, collector, output, interval):
     'Compare prices events and write them to an output sink'
     subscriptions = state['subscriptions']
-    streams = [sub.event_stream.filter(lambda ev: isinstance(ev, Trade)) 
+    streams = [sub.event_stream.filter(lambda ev: isinstance(ev, PriceUpdate)) 
                for sub in subscriptions.values()]
     compare_stream = combine_latest(*streams).map(
         lambda trades: {(t.exchange+'--'+t.symbol):t.price for t in trades})
@@ -274,11 +275,16 @@ def run(state, timeout):
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
     tasks = {name:asyncio.Task(sub.listener) for name, sub in
-             state['subscriptions'].items()}
+             state['subscriptions'].items() if sub.listener is not None}
     try:
-        completed, pending = \
-            loop.run_until_complete(asyncio.wait(tasks.values(), 
-                                    timeout=timeout))
+        if tasks:
+            logger.info(f'Running {len(tasks)} tasks ...')
+            completed, pending = \
+                loop.run_until_complete(asyncio.wait(tasks.values(), 
+                                        timeout=timeout))
+        else:
+            logger.info(f'Running forever ...')
+            loop.run_forever()
     except KeyboardInterrupt:
         pass
     finally:
