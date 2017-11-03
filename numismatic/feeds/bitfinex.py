@@ -147,6 +147,9 @@ class BitfinexFeed(Feed):
  
     def get_prices(self, assets, currencies):
         raise NotImplemented()       
+ 
+    def get_tickers(self, assets, currencies):
+        raise NotImplemented()       
 
 
 if __name__=='__main__':

@@ -45,8 +45,14 @@ def coin(state, cache_dir, requester, log_level):
         coin prices
 
         coin prices -a XMR,ZEC -c EUR,ZAR
+        
+        coin prices --raw
 
         coin prices -f luno
+
+        coin tickers -f cryptocompare
+
+        coin tickers -f cryptocompare --raw
 
         coin history
 
@@ -98,23 +104,47 @@ def info(state, feed, assets, output):
 @coin.command()
 @click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
               type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--exchange', '-e', default=None)
 @click.option('--assets', '-a', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_ASSETS')
 @click.option('--currencies', '-c', multiple=True,
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
+@click.option('--raw', is_flag=True)
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def prices(state, feed, assets, currencies, output):
+def prices(state, feed, exchange, assets, currencies, raw, output):
     'Latest asset prices'
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
-    prices = feed_client.get_prices(assets=assets, currencies=currencies)
+    prices = feed_client.get_prices(assets=assets, currencies=currencies,
+                                    exchange=exchange, raw=raw)
     write(prices, output)
 
 
 @coin.command()
 @click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
               type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--exchange', '-e', default=None)
+@click.option('--assets', '-a', multiple=True,
+              envvar=f'{ENVVAR_PREFIX}_ASSETS')
+@click.option('--currencies', '-c', multiple=True,
+              envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
+@click.option('--raw', is_flag=True)
+@click.option('--output', '-o', type=click.File('wt'), default='-')
+@pass_state
+def tickers(state, feed, exchange, assets, currencies, raw, output):
+    'Latest asset tickers'
+    feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
+                               requester=state['requester'])
+    tickers = feed_client.get_tickers(assets=assets, currencies=currencies,
+                                      exchange=exchange, raw=raw)
+    write(tickers, output)
+
+
+@coin.command()
+@click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
+              type=click.Choice(Feed._get_subclasses().keys()))
+@click.option('--exchange', '-e', default=None)
 @click.option('--freq', default='d', type=click.Choice(list('dhms')))
 @click.option('--start-date', '-s', default=-30)
 @click.option('--end-date', '-e', default=None)
@@ -124,15 +154,16 @@ def prices(state, feed, assets, currencies, output):
               envvar=f'{ENVVAR_PREFIX}_CURRENCIES')
 @click.option('--output', '-o', type=click.File('wt'), default='-')
 @pass_state
-def history(state, feed, assets, currencies, freq, start_date, end_date,
-            output):
+def history(state, feed, exchange, assets, currencies, freq, start_date,
+            end_date, output):
     'Historic asset prices and volumes'
     # FIXME: move the loop below into the Feed class
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
     data = feed_client.get_historical_data(assets, currencies, freq=freq,
                                            start_date=start_date,
-                                           end_date=end_date)
+                                           end_date=end_date, 
+                                           exchange=exchange)
     write(data, output)
 
 

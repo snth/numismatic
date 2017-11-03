@@ -7,10 +7,12 @@ import attr
 
 
 class OrderType(str, Enum):
+    TRADE = 'TRADE'
     BUY = 'BUY'
     SELL = 'SELL'
+    BID = 'BID'
+    ASK = 'ASK'
     CANCEL = 'CANCEL'
-    TRADE = 'TRADE'
 
 
 @attr.s
@@ -28,10 +30,24 @@ class Heartbeat(Event):
 
 
 @attr.s(slots=True)
-class Trade(Event):
+class PriceUpdate(Event):
     exchange = attr.ib(convert=str)
+    # FIXME: symbol should be split into asset and currency
     symbol = attr.ib(convert=str)
     price = attr.ib(convert=float)
+
+@attr.s(slots=True)
+class Ticker(PriceUpdate):
+    best_bid = attr.ib(convert=float, default=math.nan)
+    best_ask = attr.ib(convert=float, default=math.nan)
+    volume_24h = attr.ib(convert=float, default=math.nan)
+    value_24h = attr.ib(convert=float, default=math.nan)
+    open_24h = attr.ib(convert=float, default=math.nan)
+    high_24h = attr.ib(convert=float, default=math.nan)
+    low_24h = attr.ib(convert=float, default=math.nan)
+
+@attr.s(slots=True)
+class Trade(PriceUpdate):
     volume = attr.ib(convert=float)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
