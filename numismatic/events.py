@@ -17,7 +17,6 @@ class OrderType(str, Enum):
 
 @attr.s
 class Event:
-
     def json(self):
         return json.dumps(attr.asdict(self))
 
@@ -51,6 +50,7 @@ class Trade(PriceUpdate):
     volume = attr.ib(convert=float)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
+    sequence = attr.ib(default=None)
     id = attr.ib(convert=str, default='')
 
 @attr.s(slots=True)
@@ -61,6 +61,7 @@ class Order(Event):
     volume = attr.ib(convert=float, default=math.nan)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
+    sequence = attr.ib(convert=int, default=None)
     id = attr.ib(convert=str, default='')
 
     @id.validator
