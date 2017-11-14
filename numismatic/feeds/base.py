@@ -72,7 +72,7 @@ class Feed(abc.ABC, ConfigMixin):
     @websocket_client.validator
     def _websocket_client_validator(self, attribute, value):
         self.websocket_client = None if self._websocket_client_class is None \
-            else self._websocket_client_class(websocket=self.websocket)
+            else self._websocket_client_class()
         
     @staticmethod
     def get_symbol(asset, currency):
@@ -241,7 +241,6 @@ class RestClient(abc.ABC):
             data = response
         return data
 
-
 @attr.s
 class WebsocketClient(abc.ABC):
     '''Base class for WebsocketClient feeds'''
@@ -249,7 +248,31 @@ class WebsocketClient(abc.ABC):
 
     exchange = None
     websocket_url = None
-    websocket = attr.ib(default=None)
+    websocket = None
+    semaphores = dict()
+
+    def __attrs_post_init__(self):
+        websocket_url = self.websocket_url
+        if websocket_url not in WebsocketClient.semaphores:
+           WebsocketClient.semaphores[websocket_url] = asyncio.BoundedSemaphore(1)
+
+    async def _connect(self):
+        '''
+            Connects to websocket. Uses a semaphore
+            to ensure that only one connection at
+            a time will happen
+        '''
+        semaphore = WebsocketClient.semaphores[self.websocket_url]
+        with (await semaphore):
+            if WebsocketClient.websocket is not None and\
+               WebsocketClient.websocket.open:
+                return
+
+            websocket_url = self.websocket_url
+            logger.info(f'Connecting to {websocket_url!r} ...')
+            WebsocketClient.websocket = await websockets.connect(websocket_url)
+            if hasattr(self, 'on_connect'):
+                await self.on_connect(WebsocketClient.websocket)
 
     # FIXME: Should this not be named subscribe?
     def listen(self, symbol, channel=None, websocket_url=None):
@@ -271,13 +294,15 @@ class WebsocketClient(abc.ABC):
         return subscription
 
     async def _listener(self, subscription):
-        if self.websocket is None:
-            self.websocket = await self._connect(subscription)
+        if WebsocketClient.websocket is None:
+            await self._connect()
         await self._subscribe(subscription)
         while True:
             try:
-                packet = await self.websocket.recv()
+                packet = await WebsocketClient.websocket.recv()
                 subscription.raw_stream.emit(packet)
+            except websockets.exceptions.ConnectionClosed:
+                self._connect()
             except asyncio.CancelledError:
                 ## unsubscribe
                 confirmation = \
@@ -286,14 +311,6 @@ class WebsocketClient(abc.ABC):
                 logger.error(ex)
                 logger.error(packet)
                 raise
-
-    async def _connect(self, subscription):
-        websocket_url = subscription.client.websocket_url
-        logger.info(f'Connecting to {websocket_url!r} ...')
-        self.websocket = await websockets.connect(websocket_url)
-        if hasattr(self, 'on_connect'):
-            await self.on_connect(self.websocket)
-        return self.websocket
 
     async def _subscribe(self, subscription):
         pass
