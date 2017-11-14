@@ -61,7 +61,7 @@ class Order(Event):
     volume = attr.ib(convert=float, default=math.nan)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
-    sequence = attr.ib(convert=int, default=None)
+    sequence = attr.ib(default=None)
     id = attr.ib(convert=str, default='')
 
     @id.validator
