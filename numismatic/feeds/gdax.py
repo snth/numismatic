@@ -28,7 +28,7 @@ class GDAXWebsocketClient(WebsocketClient):
         await super()._subscribe(subscription)
         # install only the subscriptions handler
         subscription.handlers = [self.__handle_subscriptions]
-        channels = ['ticker'] if subscription.channel=='trades' else \
+        channels = ['ticker'] if subscription.channel=='TRADES' else \
             [subscription.channel]
         msg = dict(type='subscribe', product_ids=[subscription.symbol],
                    channels=channels)
