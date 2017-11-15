@@ -35,7 +35,7 @@ class PoloniexWebsocketClient(WebsocketClient):
 
         packet = json.dumps(connection_message)
         logger.info(packet)
-        await PoloniexWebsocketClient.websocket.send(packet)
+        await self.websocket.send(packet)
 
         return subscription
 

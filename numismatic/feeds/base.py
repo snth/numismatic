@@ -49,7 +49,6 @@ class Subscription:
     def market_name(self):
         return f'{self.exchange}--{self.symbol}--{self.channel}'
 
-
 @attr.s
 class Feed(abc.ABC, ConfigMixin):
     "Feed Base class"
@@ -103,8 +102,6 @@ class Feed(abc.ABC, ConfigMixin):
         for symbol, channel in product(self._get_pairs(assets, currencies),
                                        channels):
             if self._websocket_client_class is not None:
-                # Creates a new websocket_client for each subscription
-                # FIXME: Allow subscriptions on the same socket
                 websocket_client = self._websocket_client_class()
                 subscription = websocket_client.listen(symbol, channel)
             elif self._rest_client_class is not None:
@@ -248,13 +245,30 @@ class WebsocketClient(abc.ABC):
 
     exchange = None
     websocket_url = None
-    websocket = None
-    semaphores = dict()
+    _websocket_map = dict()
+    _semaphore_map = dict()
 
-    def __attrs_post_init__(self):
-        websocket_url = self.websocket_url
-        if websocket_url not in WebsocketClient.semaphores:
-           WebsocketClient.semaphores[websocket_url] = asyncio.BoundedSemaphore(1)
+    @property
+    def websocket(self):
+        try:
+            return self._websocket_map[self.websocket_url]
+        except KeyError:
+            return None
+    
+    @property
+    def semaphore(self):
+        if self.websocket_url is None:
+            return None
+        try:
+            return WebsocketClient._semaphore_map[self.websocket_url]
+        except KeyError:
+            semaphore = asyncio.BoundedSemaphore(1)
+            WebsocketClient._semaphore_map[self.websocket_url] = semaphore
+            return semaphore
+        except Exception as ex:
+            logger.error(ex)
+            logger.error(packet)
+            raise
 
     async def _connect(self):
         '''
@@ -262,15 +276,16 @@ class WebsocketClient(abc.ABC):
             to ensure that only one connection at
             a time will happen
         '''
-        semaphore = WebsocketClient.semaphores[self.websocket_url]
-        with (await semaphore):
-            if WebsocketClient.websocket is not None and\
-               WebsocketClient.websocket.open:
+        with (await self.semaphore):
+            websocket = self.websocket
+            if websocket is not None and\
+               websocket.open:
                 return
 
             websocket_url = self.websocket_url
             logger.info(f'Connecting to {websocket_url!r} ...')
-            WebsocketClient.websocket = await websockets.connect(websocket_url)
+            websocket = await websockets.connect(websocket_url)
+            self._websocket_map[websocket_url] = websocket
             if hasattr(self, 'on_connect'):
                 await self.on_connect(WebsocketClient.websocket)
 
@@ -294,15 +309,16 @@ class WebsocketClient(abc.ABC):
         return subscription
 
     async def _listener(self, subscription):
-        if WebsocketClient.websocket is None:
+        if self.websocket is None:
             await self._connect()
+
         await self._subscribe(subscription)
         while True:
             try:
-                packet = await WebsocketClient.websocket.recv()
+                packet = await self.websocket.recv()
                 subscription.raw_stream.emit(packet)
             except websockets.exceptions.ConnectionClosed:
-                self._connect()
+                await self._connect()
             except asyncio.CancelledError:
                 ## unsubscribe
                 confirmation = \
