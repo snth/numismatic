@@ -102,17 +102,17 @@ class Feed(abc.ABC, ConfigMixin):
         subscriptions = {}
         for symbol, channel in product(self._get_pairs(assets, currencies),
                                        channels):
-            if self._rest_client_class is not None:
+            if self._websocket_client_class is not None:
+                # Creates a new websocket_client for each subscription
+                # FIXME: Allow subscriptions on the same socket
+                websocket_client = self._websocket_client_class()
+                subscription = websocket_client.listen(symbol, channel)
+            elif self._rest_client_class is not None:
                 channel_method = getattr(self, f'get_{channel.lower()}')
                 rest_client = self._rest_client_class()
                 subscription = rest_client.listen(symbol, channel_method,
                                                   interval=interval,
                                                   exchange=exchange)
-            elif self._websocket_client_class is not None:
-                # Creates a new websocket_client for each subscription
-                # FIXME: Allow subscriptions on the same socket
-                websocket_client = self._websocket_client_class()
-                subscription = websocket_client.listen(symbol, channel)
             else:
                 raise ValueError('No listen() method found.')
             subscriptions[subscription.market_name] = subscription

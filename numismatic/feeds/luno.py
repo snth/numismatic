@@ -159,6 +159,9 @@ class LunoFeed(Feed):
         pairs = {f'{asset}{currency}' for asset, currency in 
                  product(assets, currencies)}
         return [ticker for ticker in tickers if ticker['pair'] in pairs]
+ 
+    def get_tickers(self, assets, currencies):
+        raise NotImplemented()       
 
 
 if __name__=='__main__':
