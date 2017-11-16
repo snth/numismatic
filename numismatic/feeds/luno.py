@@ -43,7 +43,9 @@ class LunoWebsocketClient(WebsocketClient):
         config_item_getter('LunoFeed', 'api_key_secret')), repr=False)
 
     def listen(self, symbol, channel=None, websocket_url=None):
-        self.websocket_url = f'{self.websocket_url}/{symbol}'
+        if websocket_url is None:
+            websocket_url = self.websocket_url
+        websocket_url = f'{websocket_url}/{symbol}'
         return super().listen(symbol, channel, websocket_url)
 
     async def _subscribe(self, subscription):

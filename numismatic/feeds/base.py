@@ -39,7 +39,6 @@ class Subscription:
     symbol = attr.ib()
     channel = attr.ib()
     client = attr.ib()
-    listener = attr.ib()
     channel_info = attr.ib(default=attr.Factory(dict))
     raw_stream = attr.ib(default=attr.Factory(Stream))
     event_stream = attr.ib(default=attr.Factory(Stream))
@@ -48,6 +47,10 @@ class Subscription:
     @property
     def market_name(self):
         return f'{self.exchange}--{self.symbol}--{self.channel}'
+
+    async def start(self):
+        logger.info(f'Starting Subscription {self.market_name!r} ...')
+        await self.client._subscribe(self)
 
 @attr.s
 class Feed(abc.ABC, ConfigMixin):
@@ -102,8 +105,9 @@ class Feed(abc.ABC, ConfigMixin):
         for symbol, channel in product(self._get_pairs(assets, currencies),
                                        channels):
             if self._websocket_client_class is not None:
-                websocket_client = self._websocket_client_class()
-                subscription = websocket_client.listen(symbol, channel)
+                if self.websocket_client is None:
+                    self.websocket_client = self._websocket_client_class()
+                subscription = self.websocket_client.listen(symbol, channel)
             elif self._rest_client_class is not None:
                 channel_method = getattr(self, f'get_{channel.lower()}')
                 rest_client = self._rest_client_class()
@@ -245,52 +249,33 @@ class WebsocketClient(abc.ABC):
 
     exchange = None
     websocket_url = None
-    _websocket_map = dict()
-    _semaphore_map = dict()
+    _websocket_future = None
+    __listener = None
+    subscriptions = []
+            
+    def __attrs_post_init__(self):
+        asyncio.ensure_future(self._listener())
 
-    @property
-    def websocket(self):
-        try:
-            return self._websocket_map[self.websocket_url]
-        except KeyError:
-            return None
-    
-    @property
-    def semaphore(self):
-        if self.websocket_url is None:
-            return None
-        try:
-            return WebsocketClient._semaphore_map[self.websocket_url]
-        except KeyError:
-            semaphore = asyncio.BoundedSemaphore(1)
-            WebsocketClient._semaphore_map[self.websocket_url] = semaphore
-            return semaphore
-        except Exception as ex:
-            logger.error(ex)
-            logger.error(packet)
-            raise
-
-    async def _connect(self):
+    async def _connect(self, websocket_url=None):
         '''
-            Connects to websocket. Uses a semaphore
-            to ensure that only one connection at
-            a time will happen
+            Connects to websocket. Uses a future to ensure that only one
+            connection at a time will happen
         '''
-        with (await self.semaphore):
-            websocket = self.websocket
-            if websocket is not None and\
-               websocket.open:
-                return
-
+        if websocket_url is None:
             websocket_url = self.websocket_url
+        if self._websocket_future is None:
             logger.info(f'Connecting to {websocket_url!r} ...')
-            websocket = await websockets.connect(websocket_url)
-            self._websocket_map[websocket_url] = websocket
-            if hasattr(self, 'on_connect'):
-                await self.on_connect(WebsocketClient.websocket)
+            self._websocket_future = \
+                asyncio.ensure_future(websockets.connect(websocket_url))
+        if not self._websocket_future.done():
+            await self._websocket_future
+        self.websocket = self._websocket_future.result()
+        return self.websocket
 
     # FIXME: Should this not be named subscribe?
     def listen(self, symbol, channel=None, websocket_url=None):
+        if websocket_url is None:
+            websocket_url = self.websocket_url
         symbol = symbol.upper()
         # set up the subscription
         channel_info = {'channel': channel}
@@ -299,50 +284,37 @@ class WebsocketClient(abc.ABC):
                                     channel=channel,
                                     channel_info=channel_info, 
                                     client=self,
-                                    listener=None,
                                     handlers=self._get_handlers(),
                                     )
-        # FIXME: find a better way to do this
-        subscription.listener = self._listener(subscription)
-        subscription.raw_stream.sink(
-            partial(self.__handle_packet, subscription=subscription))
+        self.subscriptions.append(subscription)
+        asyncio.ensure_future(subscription.start())
         return subscription
 
-    async def _listener(self, subscription):
-        if self.websocket is None:
-            await self._connect()
-
-        await self._subscribe(subscription)
+    async def _listener(self):
+        await self._connect()
         while True:
             try:
                 packet = await self.websocket.recv()
-                subscription.raw_stream.emit(packet)
+                self.__handle_packet(packet)
             except websockets.exceptions.ConnectionClosed:
                 await self._connect()
             except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = \
-                    await asyncio.shield(self._unsubscribe(subscription))
+                ## unsubscribe from all subscriptions
+                confirmations = await asyncio.gather(
+                    asyncio.shield(self._unsubscribe(subscription)) 
+                    for subscription in self.subscriptions)
             except Exception as ex:
                 logger.error(ex)
                 logger.error(packet)
                 raise
 
     async def _subscribe(self, subscription):
-        pass
+        await self._connect()
 
     async def _unsubscribe(self, subscription):
         pass
 
-    @classmethod
-    def _get_handlers(cls):
-        return [getattr(cls, attr) for attr in dir(cls)
-                if callable(getattr(cls, attr)) 
-                and attr.startswith('handle_')]
-             
-
-    @staticmethod
-    def __handle_packet(packet, subscription):
+    def __handle_packet(self, packet):
         # most of the time we get json so only decode that once
         try:
             msg = json.loads(packet)
@@ -351,7 +323,17 @@ class WebsocketClient(abc.ABC):
             raise
         if not msg:
             return
-        for handler in subscription.handlers:
-            result = handler(msg, subscription)
-            if result is STOP_HANDLERS:
-                break
+        for subscription in self.subscriptions:
+            for handler in subscription.handlers:
+                result = handler(msg, subscription)
+                if result is STOP_HANDLERS:
+                    # FIXME: should this raw_stream now rather sit on the
+                    # WebsocketClient instead of the Subscription?
+                    subscription.raw_stream.emit(packet)
+                    break
+
+    @classmethod
+    def _get_handlers(cls):
+        return [getattr(cls, attr) for attr in dir(cls)
+                if callable(getattr(cls, attr)) 
+                and attr.startswith('handle_')]

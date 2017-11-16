@@ -274,8 +274,10 @@ def run(state, timeout):
         timeout = None
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
-    tasks = {name:asyncio.Task(sub.listener) for name, sub in
-             state['subscriptions'].items() if sub.listener is not None}
+    # We have one _listener() per client
+    # tasks = {id(sub.client):asyncio.Task(sub.client.listener) 
+    #          for name, sub in state['subscriptions'].items()}
+    tasks = {}
     try:
         if tasks:
             logger.info(f'Running {len(tasks)} tasks ...')
@@ -289,10 +291,10 @@ def run(state, timeout):
         pass
     finally:
         logger.debug('cancelling ...')
-        pending = {name:task for name, task in tasks.items() 
+        pending = {id_:task for id_, task in tasks.items() 
                    if not task.done()}
-        for task_name, task in pending.items():
-            logger.debug(f'cancelling pending {task_name} ...')
+        for id_, task in pending.items():
+            logger.debug(f'cancelling pending {id_} ...')
             task.cancel()
         logger.debug('sleeping ...')
         loop.run_until_complete(asyncio.sleep(1))
