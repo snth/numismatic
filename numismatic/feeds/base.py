@@ -247,28 +247,38 @@ class WebsocketClient(abc.ABC):
     '''Base class for WebsocketClient feeds'''
     # FIXME: Is this really an ABC? What abstractmethods are there?
 
-    exchange = None
-    websocket_url = None
-    websocket = None
-    subscriptions = []
-            
-    def __attrs_post_init__(self):
-        asyncio.ensure_future(self._listener())
+    exchange = attr.ib(default=None)
+    websocket_url = attr.ib(default=None)
+    websocket = attr.ib(default=None, repr=False)
+    subscriptions = attr.ib(default=attr.Factory(list), repr=False)
 
-    async def _connect(self, websocket_url=None):
+    def __attrs_post_init__(self):
         '''
             Connects to websocket. Uses a future to ensure that only one
             connection at a time will happen
         '''
-        if websocket_url is None:
-            websocket_url = self.websocket_url
+        if self.exchange is None:
+            self.exchange = self.__class__.exchange
+        if self.websocket_url is None:
+            self.websocket_url = self.__class__.websocket_url
         if self.websocket is None:
-            logger.info(f'Connecting to {websocket_url!r} ...')
-            self.websocket = \
-                asyncio.ensure_future(websockets.connect(websocket_url))
-        if isinstance(self.websocket, asyncio.Future):
-            self.websocket = await self.websocket
-        return self.websocket
+            logger.info(f'Connecting to {self.websocket_url!r} ...')
+            websocket_future = \
+                asyncio.ensure_future(websockets.connect(self.websocket_url))
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(websocket_future)
+            self.websocket = websocket_future.result()
+        asyncio.ensure_future(self._listener())
+
+    @classmethod
+    async def connect(cls, websocket_url=None):
+        '''Constructs a WebsocketClient asynchronously
+
+        Returns a fully constructed WebsocketClient'''
+        if websocket_url is None:
+            websocket_url = cls.websocket_url 
+        websocket = await websockets.connect(websocket_url)
+        return cls(websocket_url=websocket_url, websocket=websocket)
 
     # FIXME: Should this not be named subscribe?
     def listen(self, symbol, channel=None, websocket_url=None):
@@ -289,13 +299,12 @@ class WebsocketClient(abc.ABC):
         return subscription
 
     async def _listener(self):
-        await self._connect()
         while True:
             try:
                 packet = await self.websocket.recv()
                 self.__handle_packet(packet)
             except websockets.exceptions.ConnectionClosed:
-                await self._connect()
+                self.websocket = await websockets.connect(self.websocket_url)
             except asyncio.CancelledError:
                 ## unsubscribe from all subscriptions
                 confirmations = await asyncio.gather(
@@ -307,7 +316,7 @@ class WebsocketClient(abc.ABC):
                 raise
 
     async def _subscribe(self, subscription):
-        await self._connect()
+        pass
 
     async def _unsubscribe(self, subscription):
         pass
