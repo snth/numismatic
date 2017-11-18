@@ -249,8 +249,7 @@ class WebsocketClient(abc.ABC):
 
     exchange = None
     websocket_url = None
-    _websocket_future = None
-    __listener = None
+    websocket = None
     subscriptions = []
             
     def __attrs_post_init__(self):
@@ -263,13 +262,12 @@ class WebsocketClient(abc.ABC):
         '''
         if websocket_url is None:
             websocket_url = self.websocket_url
-        if self._websocket_future is None:
+        if self.websocket is None:
             logger.info(f'Connecting to {websocket_url!r} ...')
-            self._websocket_future = \
+            self.websocket = \
                 asyncio.ensure_future(websockets.connect(websocket_url))
-        if not self._websocket_future.done():
-            await self._websocket_future
-        self.websocket = self._websocket_future.result()
+        if isinstance(self.websocket, asyncio.Future):
+            self.websocket = await self.websocket
         return self.websocket
 
     # FIXME: Should this not be named subscribe?
