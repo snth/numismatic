@@ -253,37 +253,28 @@ class WebsocketClient(abc.ABC):
     subscriptions = attr.ib(default=attr.Factory(list), repr=False)
 
     def __attrs_post_init__(self):
-        '''
-            Connects to websocket. Uses a future to ensure that only one
-            connection at a time will happen
-        '''
         if self.exchange is None:
             self.exchange = self.__class__.exchange
         if self.websocket_url is None:
             self.websocket_url = self.__class__.websocket_url
-        if self.websocket is None:
-            logger.info(f'Connecting to {self.websocket_url!r} ...')
-            websocket_future = \
-                asyncio.ensure_future(websockets.connect(self.websocket_url))
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(websocket_future)
-            self.websocket = websocket_future.result()
+        asyncio.ensure_future(self._connect())
         asyncio.ensure_future(self._listener())
 
-    @classmethod
-    async def connect(cls, websocket_url=None):
-        '''Constructs a WebsocketClient asynchronously
-
-        Returns a fully constructed WebsocketClient'''
-        if websocket_url is None:
-            websocket_url = cls.websocket_url 
-        websocket = await websockets.connect(websocket_url)
-        return cls(websocket_url=websocket_url, websocket=websocket)
+    async def _connect(self):
+        '''
+            Connects to websocket. Uses a future to ensure that only one
+            connection at a time will happen
+        '''
+        if self.websocket is None:
+            logger.info(f'Connecting to {self.websocket_url!r} ...')
+            self.websocket = \
+                asyncio.ensure_future(websockets.connect(self.websocket_url))
+        if isinstance(self.websocket, asyncio.Future):
+            self.websocket = await self.websocket
+        return self.websocket
 
     # FIXME: Should this not be named subscribe?
-    def listen(self, symbol, channel=None, websocket_url=None):
-        if websocket_url is None:
-            websocket_url = self.websocket_url
+    def listen(self, symbol, channel=None):
         symbol = symbol.upper()
         # set up the subscription
         channel_info = {'channel': channel}
@@ -299,12 +290,13 @@ class WebsocketClient(abc.ABC):
         return subscription
 
     async def _listener(self):
+        await self._connect()
         while True:
             try:
                 packet = await self.websocket.recv()
                 self.__handle_packet(packet)
             except websockets.exceptions.ConnectionClosed:
-                self.websocket = await websockets.connect(self.websocket_url)
+                await self._connect()
             except asyncio.CancelledError:
                 ## unsubscribe from all subscriptions
                 confirmations = await asyncio.gather(
@@ -316,7 +308,7 @@ class WebsocketClient(abc.ABC):
                 raise
 
     async def _subscribe(self, subscription):
-        pass
+        await self._connect()
 
     async def _unsubscribe(self, subscription):
         pass
