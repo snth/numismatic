@@ -147,6 +147,7 @@ class RestClient(abc.ABC):
 
     cache_dir = attr.ib(default=None)
     requester = attr.ib(default='base')
+    subscriptions = attr.ib(default=attr.Factory(list), repr=False)
 
     def listen(self, symbol, channel, interval=1.0, exchange=None):
         exchange = exchange if exchange else self.exchange
@@ -168,19 +169,15 @@ class RestClient(abc.ABC):
                                     channel='ticker',
                                     channel_info=channel_info, 
                                     client=self,
-                                    listener=None,
                                     handlers=self._get_handlers(),
                                     )
-        # FIXME: find a better way to do this
-        subscription.listener = self._listener(subscription, interval=interval,
-                                               callback=_get_raw_channel)
-
-        # Install the raw_stream packet handler
-        subscription.raw_stream.sink(
-            partial(self.__handle_packet, subscription=subscription))
+        self.subscriptions.append(subscription)
+        asyncio.ensure_future(
+            self._listener(subscription, interval=interval,
+                           callback=_get_raw_channel))
+        asyncio.ensure_future(subscription.start())
         logger.info(f'Subscribed to {channel_name} ...')
         return subscription
-             
 
     @staticmethod
     def __handle_packet(packet, subscription):
@@ -193,9 +190,17 @@ class RestClient(abc.ABC):
         if not msg:
             return
         for handler in subscription.handlers:
+            # FIXME: The RestClient handlers are actually message parsers
+            #        more than handlers which is different from how the
+            #        WebsocketClients do things. This should be unified and
+            #        one approach chosen.
             result = handler(msg)
             if isinstance(result, Event):
+                # FIXME: should this raw_stream now rather sit on the
+                # WebsocketClient instead of the Subscription?
+                subscription.raw_stream.emit(packet)
                 subscription.event_stream.emit(result)
+                break
             elif result is STOP_HANDLERS:
                 break
 
@@ -210,12 +215,13 @@ class RestClient(abc.ABC):
             try:
                 # FIXME: This should use an async requester as below
                 packet = callback()
-                subscription.raw_stream.emit(packet)
+                self.__handle_packet(packet, subscription)
                 await asyncio.sleep(interval)
             except asyncio.CancelledError:
-                ## unsubscribe
-                confirmation = \
-                    await asyncio.shield(self._unsubscribe(subscription))
+                ## unsubscribe from all subscriptions
+                confirmations = await asyncio.gather(
+                    asyncio.shield(self._unsubscribe(subscription)) 
+                    for subscription in self.subscriptions)
             except Exception as ex:
                 logger.error(ex)
                 logger.error(packet)
