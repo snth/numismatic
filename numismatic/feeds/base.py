@@ -280,7 +280,6 @@ class WebsocketClient(abc.ABC):
                 asyncio.ensure_future(websockets.connect(self.websocket_url))
         if isinstance(self.websocket, asyncio.Future):
             self.websocket = await self.websocket
-        return self.websocket
 
     # FIXME: Should this not be named subscribe?
     def listen(self, symbol, channel=None):
