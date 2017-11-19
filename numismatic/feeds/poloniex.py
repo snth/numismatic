@@ -48,7 +48,7 @@ class PoloniexWebsocketClient(WebsocketClient):
         elif channel_id == CHANNEL_ID_MAP['ticker']:
             pass  # do nothing for now
         else:
-            PoloniexWebsocketClient._trades_and_orders(msg, subscription)
+            return PoloniexWebsocketClient._trades_and_orders(msg, subscription)
 
     @staticmethod
     def _trades_and_orders(msg, subscription):
@@ -57,27 +57,50 @@ class PoloniexWebsocketClient(WebsocketClient):
             not separate them? Because Poloniex returns
             one message with both information embedded
         '''
+        channel_id = msg[0]
+        msg_handled = False
+
         seq = msg[1]
         for data in msg[2]:
             msg_type = data[0]
 
             if msg_type == 'i':
-                PoloniexWebsocketClient._orderbook(seq, data[1], subscription)
-            elif msg_type == 'o':
-                PoloniexWebsocketClient._orderbook_removemodify(seq, data, subscription)
-            elif msg_type == 't':
-                PoloniexWebsocketClient._trade(seq, data, subscription)
+                # Will also assign channel_info. A peculiarity of Poloniex is that
+                # it can only be done at this point
+                msg_handled = PoloniexWebsocketClient._orderbook(channel_id, seq, data[1], subscription)
+            else:
+                # Channel information should be present at this stage
+                # and so a subscription can be matched to a channel via
+                # this info
+                if subscription.channel_info['chanId'] == channel_id:
+                    if msg_type == 'o':
+                        msg_handled = PoloniexWebsocketClient._orderbook_removemodify(seq, data, subscription)
+                    elif msg_type == 't':
+                        msg_handled = PoloniexWebsocketClient._trade(seq, data, subscription)
 
-        return STOP_HANDLERS
+        if msg_handled == True:
+            return STOP_HANDLERS
 
     @staticmethod
-    def _orderbook(seq, market_info, subscription):
+    def _orderbook(channel_id, seq, market_info, subscription):
         '''
             Poloniex order book, this will provide a snapshot
             of the order book
             TODO Put format here
         '''
         for key, value in market_info.items():
+            if key == 'currencyPair':
+                # Ensures that only the correct subscription
+                # is handled. Why necessary? Because if there
+                # are multiple subscription, subscription.symbol
+                # actually identifies channelid, so this makes
+                # sure subscription matches to correct channelid
+                if subscription.symbol != value:
+                    return False
+                # Also should point out that needed channel info
+                # is in this message, and so this must be done here
+                subscription.channel_info = {'channel': subscription.symbol,\
+                                             'chanId': channel_id}
             if key == 'orderBook':
                 for ask_price, volume in value[0].items():
                     event = Order(
@@ -100,6 +123,7 @@ class PoloniexWebsocketClient(WebsocketClient):
                         sequence=seq,
                     )
                     subscription.event_stream.emit(event)
+        return True
 
     @staticmethod
     def _trade(seq, data, subscription):
@@ -121,6 +145,7 @@ class PoloniexWebsocketClient(WebsocketClient):
         )
 
         subscription.event_stream.emit(event)
+        return True
     
     @staticmethod
     def _orderbook_removemodify(seq, data, subscription):
@@ -152,6 +177,7 @@ class PoloniexWebsocketClient(WebsocketClient):
             )
 
         subscription.event_stream.emit(event)
+        return True
 
 class PoloniexFeed(Feed):
     _websocket_client_class = PoloniexWebsocketClient

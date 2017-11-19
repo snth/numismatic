@@ -274,29 +274,25 @@ def run(state, timeout):
         timeout = None
     loop = asyncio.get_event_loop()
     logger.debug('starting ...')
-    tasks = {name:asyncio.Task(sub.listener) for name, sub in
-             state['subscriptions'].items() if sub.listener is not None}
+    tasks = asyncio.Task.all_tasks()
     try:
         if tasks:
             logger.info(f'Running {len(tasks)} tasks ...')
             completed, pending = \
-                loop.run_until_complete(asyncio.wait(tasks.values(), 
-                                        timeout=timeout))
+                loop.run_until_complete(asyncio.wait(tasks, timeout=timeout))
         else:
             logger.info(f'Running forever ...')
             loop.run_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        logger.debug('cancelling ...')
-        pending = {name:task for name, task in tasks.items() 
-                   if not task.done()}
-        for task_name, task in pending.items():
-            logger.debug(f'cancelling pending {task_name} ...')
+        logger.debug('Cancelling ...')
+        tasks = asyncio.Task.all_tasks()
+        pending = {task for task in tasks if not task.done()}
+        for task in pending:
+            logger.debug(f'Cancelling pending task {id(task)} ...')
             task.cancel()
-        logger.debug('sleeping ...')
-        loop.run_until_complete(asyncio.sleep(1))
-        logger.debug('done')
+        logger.debug('Done')
 
 
 def write(data, file, sep='\n'):

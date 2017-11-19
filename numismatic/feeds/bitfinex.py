@@ -23,11 +23,13 @@ class BitfinexWebsocketClient(WebsocketClient):
     exchange = 'Bitfinex'
     websocket_url = 'wss://api.bitfinex.com/ws/2'
 
-    async def on_connect(self, ws):
-        packet = await self.websocket.recv()
-        connection_status = json.loads(packet)
-        logger.info(connection_status)
-        return ws
+    @classmethod
+    def handle_connect(cls, msg, subscription):
+        connection_status = msg
+        logger.debug(connection_status)
+        subscription.handlers.remove(cls.handle_connect)
+        logger.info(f'Removed {cls.__name__}.handle_connect()')
+        return STOP_HANDLERS
 
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)
