@@ -11,6 +11,7 @@ import json
 from streamz import Stream
 import attr
 import websockets
+from websockets.client import WebSocketClientProtocol
 
 from ..requesters import Requester
 from ..config import ConfigMixin
@@ -265,7 +266,9 @@ class WebsocketClient(abc.ABC):
             Connects to websocket. Uses a future to ensure that only one
             connection at a time will happen
         '''
-        if self.websocket is None:
+        if self.websocket is None or \
+                isinstance(self.websocket, WebSocketClientProtocol) and \
+                not self.websocket.open:
             logger.info(f'Connecting to {self.websocket_url!r} ...')
             self.websocket = \
                 asyncio.ensure_future(websockets.connect(self.websocket_url))
