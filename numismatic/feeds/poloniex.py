@@ -72,7 +72,8 @@ class PoloniexWebsocketClient(WebsocketClient):
                 # Channel information should be present at this stage
                 # and so a subscription can be matched to a channel via
                 # this info
-                if subscription.channel_info['chanId'] == channel_id:
+                if 'chanId' in subscription.channel_info and \
+                    subscription.channel_info['chanId'] == channel_id:
                     if msg_type == 'o':
                         msg_handled = PoloniexWebsocketClient._orderbook_removemodify(seq, data, subscription)
                     elif msg_type == 't':
