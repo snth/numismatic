@@ -41,8 +41,12 @@ class PoloniexWebsocketClient(WebsocketClient):
 
     @staticmethod
     def handle_message(msg, subscription):
+        if 'error' in msg:
+            error_message = msg['error']
+            logger.error(f'{error_message} with subscription {subscription}')
+            return
+        
         channel_id = msg[0]
-
         if channel_id == CHANNEL_ID_MAP['heartbeat']:
             pass  # do nothing for now
         elif channel_id == CHANNEL_ID_MAP['ticker']:
