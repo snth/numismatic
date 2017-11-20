@@ -15,11 +15,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s
 class GDAXWebsocketClient(WebsocketClient):
-    '''Websocket client for the GDAX WebsocketClient
-
-    This currently opens a separate socket for every symbol that we listen to.
-    This could probably be handled by having just one socket.
-    '''
+    '''Websocket client for the GDAX WebsocketClient'''
 
     exchange = 'GDAX'
     websocket_url = 'wss://ws-feed.gdax.com'
@@ -126,7 +122,7 @@ if __name__=='__main__':
     printer = output_stream.map(print)
 
     bfx = GDAXWebsocketClient(output_stream=output_stream)
-    bfx_btc = bfx.listen('BTC-USD', 'ticker,heartbeat')
+    bfx_btc = bfx.subscribe('BTC-USD', 'ticker,heartbeat')
 
     loop = asyncio.get_event_loop()
     future = asyncio.wait([bfx_btc], timeout=15)

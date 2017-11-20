@@ -14,11 +14,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s
 class BitfinexWebsocketClient(WebsocketClient):
-    '''Websocket client for the Bitfinex WebsocketClient
-
-    This currently opens a separate socket for every symbol that we listen to.
-    This could probably be handled by having just one socket.
-    '''
+    '''Websocket client for the Bitfinex WebsocketClient'''
 
     exchange = 'Bitfinex'
     websocket_url = 'wss://api.bitfinex.com/ws/2'
@@ -164,7 +160,7 @@ if __name__=='__main__':
     printer = output_stream.map(print)
 
     bfx = BitfinexWebsocketClient(output_stream=output_stream)
-    bfx_btc = bfx.listen('BTCUSD', 'trades')
+    bfx_btc = bfx.subscribe('BTCUSD', 'trades')
 
     loop = asyncio.get_event_loop()
     future = asyncio.wait([bfx_btc], timeout=15)

@@ -42,11 +42,11 @@ class LunoWebsocketClient(WebsocketClient):
     api_key_secret = attr.ib(default=attr.Factory(
         config_item_getter('LunoFeed', 'api_key_secret')), repr=False)
 
-    def listen(self, symbol, channel=None, websocket_url=None):
+    def subscribe(self, symbol, channel=None, websocket_url=None):
         if websocket_url is None:
             websocket_url = self.websocket_url
         websocket_url = f'{websocket_url}/{symbol}'
-        return super().listen(symbol, channel, websocket_url)
+        return super().subscribe(symbol, channel, websocket_url)
 
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)
@@ -181,7 +181,7 @@ if __name__=='__main__':
 
     luno = LunoWebsocketClient(output_stream=output_stream, api_key_id=api_key_id,
                             api_key_secret=api_key_secret)
-    luno_btc = luno.listen('XBTZAR')
+    luno_btc = luno.subscribe('XBTZAR')
 
     loop = asyncio.get_event_loop()
     future = asyncio.wait([luno_btc], timeout=15)
