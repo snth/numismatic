@@ -42,11 +42,11 @@ class LunoWebsocketClient(WebsocketClient):
     api_key_secret = attr.ib(default=attr.Factory(
         config_item_getter('LunoFeed', 'api_key_secret')), repr=False)
 
-    def subscribe(self, symbol, channel=None, websocket_url=None):
+    def subscribe(self, asset, currency, channel=None, websocket_url=None):
         if websocket_url is None:
             websocket_url = self.websocket_url
-        websocket_url = f'{websocket_url}/{symbol}'
-        return super().subscribe(symbol, channel, websocket_url)
+        websocket_url = f'{websocket_url}/{asset}{currency}'
+        return super().subscribe(asset, currency, channel, websocket_url)
 
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)
@@ -60,7 +60,8 @@ class LunoWebsocketClient(WebsocketClient):
         if 'asks' in msg:
             for order in msg['asks']:
                 order_ev = Order(exchange=subscription.exchange,
-                                 symbol=subscription.symbol,
+                                 asset=subscription.asset,
+                                 currency=subscription.currency,
                                  price=order['price'],
                                  volume=order['volume'],
                                  type='SELL',
@@ -70,7 +71,8 @@ class LunoWebsocketClient(WebsocketClient):
         if 'bids' in msg:
             for order in msg['bids']:
                 order_ev = Order(exchange=subscription.exchange,
-                                 symbol=subscription.symbol,
+                                 asset=subscription.asset,
+                                 currency=subscription.currency,
                                  price=order['price'],
                                  volume=order['volume'],
                                  type='BUY',
@@ -93,7 +95,8 @@ class LunoWebsocketClient(WebsocketClient):
                 value = float(trade['counter'])
                 price = value/volume
                 trade_ev = Trade(exchange=subscription.exchange,
-                                 symbol=subscription.symbol,
+                                 asset=subscription.asset,
+                                 currency=subscription.currency,
                                  price=price,
                                  volume=volume,
                                  type='TRADE',
@@ -111,7 +114,8 @@ class LunoWebsocketClient(WebsocketClient):
         if 'create_update' in msg and msg['create_update']:
             order = msg['create_update']
             order_ev = Order(exchange=subscription.exchange,
-                             symbol=subscription.symbol,
+                             asset=subscription.asset,
+                             currency=subscription.currency,
                              price=order['price'],
                              volume=order['volume'],
                              type='BUY' if order['type']=='BID' else 'SELL',
@@ -129,7 +133,8 @@ class LunoWebsocketClient(WebsocketClient):
         if 'delete_update' in msg and msg['delete_update']:
             order = msg['delete_update']
             cancel_ev = Order(exchange=subscription.exchange,
-                              symbol=subscription.symbol,
+                              asset=subscription.asset,
+                              currency=subscription.currency,
                               timestamp=timestamp,
                               type='CANCEL',
                               id=order['order_id'],

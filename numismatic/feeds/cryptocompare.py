@@ -95,7 +95,8 @@ class CryptoCompareRestClient(RestClient):
         if isinstance(msg, dict) and \
                 set(msg)=={'exchange', 'asset', 'currency', 'price'}:
             event = PriceUpdate(exchange=msg['exchange'],
-                                symbol=msg['asset']+msg['currency'],
+                                asset=msg['asset'],
+                                currency=msg['currency'],
                                 price=msg['price'])
             return event
 
@@ -104,15 +105,15 @@ class CryptoCompareRestClient(RestClient):
         if isinstance(msg, dict) and \
                 {'PRICE', 'VOLUME24HOUR', 'VOLUME24HOURTO', 'OPEN24HOUR',
                  'HIGH24HOUR', 'LOW24HOUR'} <= set(msg):
-            symbol = msg['FROMSYMBOL']+msg['TOSYMBOL']
             event = Ticker(exchange=msg['MARKET'],
-                        symbol=symbol, price=msg['PRICE'],
-                        volume_24h=msg['VOLUME24HOUR'],
-                        value_24h=msg['VOLUME24HOURTO'],
-                        open_24h=msg['OPEN24HOUR'],
-                        high_24h=msg['HIGH24HOUR'],
-                        low_24h=msg['LOW24HOUR'],
-                        )
+                           asset=msg['FROMSYMBOL'],
+                           currency = msg['TOSYMBOL'],
+                           price=msg['PRICE'],
+                           volume_24h=msg['VOLUME24HOUR'],
+                           value_24h=msg['VOLUME24HOURTO'],
+                           open_24h=msg['OPEN24HOUR'],
+                           high_24h=msg['HIGH24HOUR'],
+                           low_24h=msg['LOW24HOUR'],)
             return event
 
 
