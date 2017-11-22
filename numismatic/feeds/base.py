@@ -108,15 +108,15 @@ class Feed(abc.ABC, ConfigMixin):
             if self._websocket_client_class is not None:
                 if self.websocket_client is None:
                     self.websocket_client = self._websocket_client_class()
-                subscription = self.websocket_client.listen(symbol, channel)
+                subscription = self.websocket_client.subscribe(symbol, channel)
             elif self._rest_client_class is not None:
                 channel_method = getattr(self, f'get_{channel.lower()}')
                 rest_client = self._rest_client_class()
-                subscription = rest_client.listen(symbol, channel_method,
-                                                  interval=interval,
-                                                  exchange=exchange)
+                subscription = rest_client.subscribe(symbol, channel_method,
+                                                     interval=interval,
+                                                     exchange=exchange)
             else:
-                raise ValueError('No listen() method found.')
+                raise ValueError('No subscribe() method found.')
             subscriptions[subscription.market_name] = subscription
         return subscriptions
 
@@ -149,7 +149,7 @@ class RestClient(abc.ABC):
     requester = attr.ib(default='base')
     subscriptions = attr.ib(default=attr.Factory(list), repr=False)
 
-    def listen(self, symbol, channel, interval=1.0, exchange=None):
+    def subscribe(self, symbol, channel, interval=1.0, exchange=None):
         exchange = exchange if exchange else self.exchange
         channel_name = f'{exchange}--{symbol}--{channel.__name__}'
         logger.info(f'Subscribing to {channel_name} ...')
@@ -282,7 +282,7 @@ class WebsocketClient(abc.ABC):
             self.websocket = await self.websocket
 
     # FIXME: Should this not be named subscribe?
-    def listen(self, symbol, channel=None):
+    def subscribe(self, symbol, channel=None):
         symbol = symbol.upper()
         # set up the subscription
         channel_info = {'channel': channel}

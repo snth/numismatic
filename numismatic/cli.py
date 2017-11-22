@@ -21,9 +21,24 @@ AsyncIOMainLoop().install()
 ENVVAR_PREFIX = 'NUMISMATIC'
 
 
+class AliasedGroup(click.Group):
+
+    def get_command(self, ctx, cmd_name):
+        rv = click.Group.get_command(self, ctx, cmd_name)
+        if rv is not None:
+            return rv
+        matches = [x for x in self.list_commands(ctx)
+                   if x.startswith(cmd_name)]
+        if not matches:
+            return None
+        elif len(matches) == 1:
+            return click.Group.get_command(self, ctx, matches[0])
+        ctx.fail('Too many matches: %s' % ', '.join(sorted(matches)))
+
+
 pass_state = click.make_pass_decorator(dict, ensure=True)
 
-@click.group(chain=True)
+@click.group(cls=AliasedGroup, chain=True)
 @click.option('--cache-dir', '-d', default=None)
 @click.option('--requester', '-r', default='base',
               type=click.Choice(['base', 'caching']))
@@ -58,22 +73,22 @@ def coin(state, cache_dir, requester, log_level):
 
         coin history -a ETH -c BTC -o ETH-BTH-history.json
 
-        coin listen collect run
+        coin subscribe collect run
 
-        coin listen -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
+        coin subscribe -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
 
-        coin listen -f bitfinex -f gdax collect run
+        coin subscribe -f bitfinex -f gdax collect run
 
-        coin listen -f bitfinex -f gdax collect --raw run
+        coin subscribe -f bitfinex -f gdax collect --raw run
 
-        coin listen -f cryptocompare collect run
+        coin subscribe -f cryptocompare collect run
 
-        coin listen -f cryptocompare -e kraken collect run
+        coin subscribe -f cryptocompare -e kraken collect run
 
-        coin listen -f bitfinex -f gdax compare run
+        coin subscribe -f bitfinex -f gdax compare run
 
-        coin listen -f cryptocompare -C tickers -e cexio listen -f \\
-            cryptocompare -C prices -e kraken listen -f bitfinex compare \\
+        coin sub -f cryptocompare -C tickers -e cexio sub -f \\
+            cryptocompare -C prices -e kraken sub -f bitfinex compare \\
             run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
@@ -200,8 +215,8 @@ def tabulate(data):
               help='Interval between requests for RestClient subscriptions')
 @click.option('--channels', '-C', multiple=True)
 @pass_state
-def listen(state, feed, exchange, assets, currencies, interval, channels):
-    'Listen to live events from a feed'
+def subscribe(state, feed, exchange, assets, currencies, interval, channels):
+    'Subscribe to live events from a feed'
     feed_client = Feed.factory(feed) 
     subscriptions = feed_client.subscribe(assets, currencies, channels,
                                           exchange=exchange, interval=interval)
