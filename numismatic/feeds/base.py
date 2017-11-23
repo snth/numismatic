@@ -104,23 +104,30 @@ class Feed(abc.ABC, ConfigMixin):
         channels = self._validate_parameter('channels', channels)
         subscriptions = {}
         for asset, currency, channel in product(assets, currencies, channels):
-            if self._websocket_client_class is not None:
-                if self.websocket_client is None:
-                    self.websocket_client = self._websocket_client_class()
-                subscription = self.websocket_client.subscribe(asset, currency,
-                                                               channel)
-            elif self._rest_client_class is not None:
-                print(channel)
-                channel_method = getattr(self, f'get_{channel.lower()}')
-                rest_client = self._rest_client_class()
-                subscription = rest_client.subscribe(asset, currency,
-                                                     channel_method,
-                                                     interval=interval,
-                                                     exchange=exchange)
-            else:
-                raise ValueError('No subscribe() method found.')
+            subscription = \
+                self._subscribe(asset, currency, channel, exchange=exchange,
+                                interval=interval)
             subscriptions[subscription.topic] = subscription
         return subscriptions
+
+    def _subscribe(self, asset, currency, channel, exchange=None, 
+                   interval=1.0):
+        if self._websocket_client_class is not None:
+            if self.websocket_client is None:
+                self.websocket_client = self._websocket_client_class()
+            subscription = \
+                self.websocket_client.subscribe(asset, currency, channel)
+        elif self._rest_client_class is not None:
+            if self.rest_client is None:
+                self.rest_client = self._rest_client_class()
+            channel_method = getattr(self, f'get_{channel.lower()}')
+            subscription = self.rest_client.subscribe(asset, currency,
+                                                      channel_method,
+                                                      interval=interval,
+                                                      exchange=exchange)
+        else:
+            raise ValueError('No subscribe() method found.')
+        return subscription
 
     @classmethod
     def _validate_parameter(cls, parameter, value):
@@ -152,6 +159,7 @@ class RestClient(abc.ABC):
 
     def subscribe(self, asset, currency, channel, interval=1.0, exchange=None):
         exchange = exchange if exchange else self.exchange
+        # FIXME: Remove channel_info or make it more generic
         channel_info = {'channel': channel.__name__}
         subscription = Subscription(exchange=exchange,
                                     asset=asset,
@@ -164,6 +172,7 @@ class RestClient(abc.ABC):
 
         logger.info(f'Subscribing to {subscription.topic} ...')
 
+        # FIXME: tidy this up
         def _get_raw_channel():
             messages = channel(asset, currency, exchange=exchange, raw=True)
             packet = '\n'.join(json.dumps(msg) for msg in messages)

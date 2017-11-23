@@ -42,11 +42,10 @@ class LunoWebsocketClient(WebsocketClient):
     api_key_secret = attr.ib(default=attr.Factory(
         config_item_getter('LunoFeed', 'api_key_secret')), repr=False)
 
-    def subscribe(self, asset, currency, channel=None, websocket_url=None):
-        if websocket_url is None:
-            websocket_url = self.websocket_url
-        websocket_url = f'{websocket_url}/{asset}{currency}'
-        return super().subscribe(asset, currency, channel, websocket_url)
+    def subscribe(self, asset, currency, channel=None):
+        # TODO: I don't like
+        self.websocket_url = f'{self.websocket_url}/{asset}{currency}'
+        return super().subscribe(asset, currency, channel)
 
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)
@@ -64,7 +63,7 @@ class LunoWebsocketClient(WebsocketClient):
                                  currency=subscription.currency,
                                  price=order['price'],
                                  volume=order['volume'],
-                                 type='SELL',
+                                 type='ASK',
                                  id=order['id'], 
                                  )
                 subscription.event_stream.emit(order_ev)
@@ -75,7 +74,7 @@ class LunoWebsocketClient(WebsocketClient):
                                  currency=subscription.currency,
                                  price=order['price'],
                                  volume=order['volume'],
-                                 type='BUY',
+                                 type='BID',
                                  id=order['id'], 
                                  )
                 subscription.event_stream.emit(order_ev)
@@ -118,7 +117,7 @@ class LunoWebsocketClient(WebsocketClient):
                              currency=subscription.currency,
                              price=order['price'],
                              volume=order['volume'],
-                             type='BUY' if order['type']=='BID' else 'SELL',
+                             type='BID' if order['type']=='BID' else 'ASK',
                              timestamp=timestamp,
                              id=order['order_id'],
                              )
@@ -165,6 +164,12 @@ class LunoFeed(Feed):
  
     def get_tickers(self, assets, currencies):
         raise NotImplemented()       
+
+    def _subscribe(self, asset, currency, channel, exchange=None, 
+                   interval=1.0):
+        websocket_client = self._websocket_client_class()
+        subscription = websocket_client.subscribe(asset, currency, channel)
+        return subscription
 
 
 if __name__=='__main__':

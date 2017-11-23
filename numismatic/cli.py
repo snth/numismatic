@@ -88,8 +88,8 @@ def coin(state, cache_dir, requester, log_level):
         coin subscribe -f bitfinex -f gdax compare run
 
         coin sub -f cryptocompare -C tickers -e cexio sub -f \\
-            cryptocompare -C prices -e kraken sub -f bitfinex compare \\
-            run
+            cryptocompare -C prices -e kraken sub -f bitfinex sub -f gdax \\
+            sub -f poloniex compare run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
