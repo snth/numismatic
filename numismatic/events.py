@@ -51,7 +51,7 @@ class Trade(PriceUpdate):
     volume = attr.ib(convert=float)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
-    sequence = attr.ib(default=None)
+    sequence = attr.ib(convert=str, default=None)
     id = attr.ib(convert=str, default='')
 
 @attr.s(slots=True)
@@ -63,7 +63,7 @@ class Order(Event):
     volume = attr.ib(convert=float, default=math.nan)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
-    sequence = attr.ib(default=None)
+    sequence = attr.ib(convert=str, default=None)
     id = attr.ib(convert=str, default='')
 
     @id.validator

@@ -20,6 +20,10 @@ class GDAXWebsocketClient(WebsocketClient):
     exchange = 'GDAX'
     websocket_url = 'wss://ws-feed.gdax.com'
 
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}-{currency}'
+
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)
             

@@ -271,7 +271,7 @@ def compare(state, collector, output, interval):
     streams = [sub.event_stream.filter(lambda ev: isinstance(ev, PriceUpdate)) 
                for sub in subscriptions.values()]
     compare_stream = combine_latest(*streams).map(
-        lambda trades: {(t.exchange+'--'+t.symbol):t.price for t in trades})
+        lambda trades: {(t.exchange+'--'+t.asset+'/'+t.currency):t.price for t in trades})
     collector_name = collector
     collector = Collector.factory(collector_name, event_stream=compare_stream,
                                   path=output, interval=interval)
