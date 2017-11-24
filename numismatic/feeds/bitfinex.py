@@ -33,8 +33,7 @@ class BitfinexWebsocketClient(WebsocketClient):
         # it needs to go through the main __handle_packet so the raw_stream is
         # updated.
         subscription.handlers = [self.__handle_subscribed]
-        msg = json.dumps(dict(event='subscribe',
-                              channel=subscription.channel, 
+        msg = json.dumps(dict(event='subscribe', channel=subscription.channel, 
                               symbol=subscription.symbol))
         logger.info(msg)
         await self.websocket.send(msg)
@@ -85,7 +84,8 @@ class BitfinexWebsocketClient(WebsocketClient):
                 msg[0]==subscription.channel_info['chanId'] and \
                 msg[1]=='hb':
             msg = Heartbeat(exchange=subscription.exchange,
-                            symbol=subscription.symbol,
+                            asset=subscription.asset,
+                            currency=subscription.currency,
                             timestamp=time.time())
             subscription.event_stream.emit(msg)
             # stop processing other handlers
@@ -106,7 +106,8 @@ class BitfinexWebsocketClient(WebsocketClient):
                 raise
             # FIXME: validate the channel_id below
             msg = Trade(exchange=subscription.exchange, 
-                        symbol=subscription.symbol, 
+                        asset=subscription.asset, 
+                        currency=subscription.currency, 
                         price=price,
                         volume=volume,
                         timestamp=timestamp/1000,
@@ -123,7 +124,8 @@ class BitfinexWebsocketClient(WebsocketClient):
             # snapshot
             for (trade_id, timestamp, volume, price) in reversed(msg[1]):
                 msg = Trade(exchange=subscription.exchange,
-                            symbol=subscription.symbol, 
+                            asset=subscription.asset, 
+                            currency=subscription.currency, 
                             price=price, 
                             volume=volume,
                             timestamp=timestamp/1000,

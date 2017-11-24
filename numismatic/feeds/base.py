@@ -24,7 +24,6 @@ STOP_HANDLERS = object()        # sentinel to signal end of handler processing
 
 # TODO:
 #   * Websocket Client vs Subscription --> clarify and unify
-#   * Rename symbol to pair
 #  Terms
 #   * Asset: BTC
 #   * Currency: USD
@@ -37,7 +36,8 @@ STOP_HANDLERS = object()        # sentinel to signal end of handler processing
 @attr.s
 class Subscription:
     exchange = attr.ib()
-    symbol = attr.ib()
+    asset = attr.ib()
+    currency = attr.ib()
     channel = attr.ib()
     client = attr.ib()
     channel_info = attr.ib(default=attr.Factory(dict))
@@ -46,11 +46,15 @@ class Subscription:
     handlers = attr.ib(default=attr.Factory(list))
 
     @property
-    def market_name(self):
-        return f'{self.exchange}--{self.symbol}--{self.channel}'
+    def topic(self):
+        return f'{self.exchange}~{self.asset}~{self.currency}~{self.channel}'
+        
+    @property
+    def symbol(self):
+        return self.client.get_symbol(self.asset, self.currency)
 
     async def start(self):
-        logger.info(f'Starting Subscription {self.market_name!r} ...')
+        logger.info(f'Starting Subscription {self.topic!r} ...')
         await self.client._subscribe(self)
 
 @attr.s
@@ -76,10 +80,6 @@ class Feed(abc.ABC, ConfigMixin):
     def _websocket_client_validator(self, attribute, value):
         self.websocket_client = None if self._websocket_client_class is None \
             else self._websocket_client_class()
-        
-    @staticmethod
-    def get_symbol(asset, currency):
-        return f'{asset}{currency}'
 
     @abc.abstractmethod
     def get_list(self):
@@ -103,22 +103,31 @@ class Feed(abc.ABC, ConfigMixin):
         currencies = self._validate_parameter('currencies', currencies)
         channels = self._validate_parameter('channels', channels)
         subscriptions = {}
-        for symbol, channel in product(self._get_pairs(assets, currencies),
-                                       channels):
-            if self._websocket_client_class is not None:
-                if self.websocket_client is None:
-                    self.websocket_client = self._websocket_client_class()
-                subscription = self.websocket_client.subscribe(symbol, channel)
-            elif self._rest_client_class is not None:
-                channel_method = getattr(self, f'get_{channel.lower()}')
-                rest_client = self._rest_client_class()
-                subscription = rest_client.subscribe(symbol, channel_method,
-                                                     interval=interval,
-                                                     exchange=exchange)
-            else:
-                raise ValueError('No subscribe() method found.')
-            subscriptions[subscription.market_name] = subscription
+        for asset, currency, channel in product(assets, currencies, channels):
+            subscription = \
+                self._subscribe(asset, currency, channel, exchange=exchange,
+                                interval=interval)
+            subscriptions[subscription.topic] = subscription
         return subscriptions
+
+    def _subscribe(self, asset, currency, channel, exchange=None, 
+                   interval=1.0):
+        if self._websocket_client_class is not None:
+            if self.websocket_client is None:
+                self.websocket_client = self._websocket_client_class()
+            subscription = \
+                self.websocket_client.subscribe(asset, currency, channel)
+        elif self._rest_client_class is not None:
+            if self.rest_client is None:
+                self.rest_client = self._rest_client_class()
+            channel_method = getattr(self, f'get_{channel.lower()}')
+            subscription = self.rest_client.subscribe(asset, currency,
+                                                      channel_method,
+                                                      interval=interval,
+                                                      exchange=exchange)
+        else:
+            raise ValueError('No subscribe() method found.')
+        return subscription
 
     @classmethod
     def _validate_parameter(cls, parameter, value):
@@ -136,11 +145,6 @@ class Feed(abc.ABC, ConfigMixin):
         else:
             raise AttributeError
 
-    @classmethod
-    def _get_pairs(cls, assets, currencies):
-        for asset, currency in product(assets, currencies):
-            yield cls.get_symbol(asset, currency)
-
 
 @attr.s
 class RestClient(abc.ABC):
@@ -149,34 +153,37 @@ class RestClient(abc.ABC):
     requester = attr.ib(default='base')
     subscriptions = attr.ib(default=attr.Factory(list), repr=False)
 
-    def subscribe(self, symbol, channel, interval=1.0, exchange=None):
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}{currency}'
+
+    def subscribe(self, asset, currency, channel, interval=1.0, exchange=None):
         exchange = exchange if exchange else self.exchange
-        channel_name = f'{exchange}--{symbol}--{channel.__name__}'
-        logger.info(f'Subscribing to {channel_name} ...')
-        # timer
-
-        # FIXME: get the symbol properly
-        # application
-        def _get_raw_channel():
-            messages = channel(symbol[:3], symbol[3:], exchange=exchange,
-                               raw=True)
-            packet = '\n'.join(json.dumps(msg) for msg in messages)
-            return packet
-
+        # FIXME: Remove channel_info or make it more generic
         channel_info = {'channel': channel.__name__}
         subscription = Subscription(exchange=exchange,
-                                    symbol=symbol,
+                                    asset=asset,
+                                    currency=currency,
                                     channel='ticker',
                                     channel_info=channel_info, 
                                     client=self,
                                     handlers=self._get_handlers(),
                                     )
+
+        logger.info(f'Subscribing to {subscription.topic} ...')
+
+        # FIXME: tidy this up
+        def _get_raw_channel():
+            messages = channel(asset, currency, exchange=exchange, raw=True)
+            packet = '\n'.join(json.dumps(msg) for msg in messages)
+            return packet
+
         self.subscriptions.append(subscription)
         asyncio.ensure_future(
             self._listener(subscription, interval=interval,
                            callback=_get_raw_channel))
         asyncio.ensure_future(subscription.start())
-        logger.info(f'Subscribed to {channel_name} ...')
+        logger.info(f'Subscribed to {subscription.topic} ...')
         return subscription
 
     @staticmethod
@@ -267,6 +274,10 @@ class WebsocketClient(abc.ABC):
         asyncio.ensure_future(self._connect())
         asyncio.ensure_future(self._listener())
 
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}{currency}'
+
     async def _connect(self):
         '''
             Connects to websocket. Uses a future to ensure that only one
@@ -281,13 +292,14 @@ class WebsocketClient(abc.ABC):
         if isinstance(self.websocket, asyncio.Future):
             self.websocket = await self.websocket
 
-    # FIXME: Should this not be named subscribe?
-    def subscribe(self, symbol, channel=None):
-        symbol = symbol.upper()
+    def subscribe(self, asset, currency, channel=None):
+        asset = asset.upper()
+        currency = currency.upper()
         # set up the subscription
         channel_info = {'channel': channel}
         subscription = Subscription(exchange=self.exchange, 
-                                    symbol=symbol,
+                                    asset=asset,
+                                    currency=currency,
                                     channel=channel,
                                     channel_info=channel_info, 
                                     client=self,

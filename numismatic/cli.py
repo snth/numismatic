@@ -88,8 +88,8 @@ def coin(state, cache_dir, requester, log_level):
         coin subscribe -f bitfinex -f gdax compare run
 
         coin sub -f cryptocompare -C tickers -e cexio sub -f \\
-            cryptocompare -C prices -e kraken sub -f bitfinex compare \\
-            run
+            cryptocompare -C prices -e kraken sub -f bitfinex sub -f gdax \\
+            sub -f poloniex compare run
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
@@ -271,7 +271,7 @@ def compare(state, collector, output, interval):
     streams = [sub.event_stream.filter(lambda ev: isinstance(ev, PriceUpdate)) 
                for sub in subscriptions.values()]
     compare_stream = combine_latest(*streams).map(
-        lambda trades: {(t.exchange+'--'+t.symbol):t.price for t in trades})
+        lambda trades: {(t.exchange+'--'+t.asset+'/'+t.currency):t.price for t in trades})
     collector_name = collector
     collector = Collector.factory(collector_name, event_stream=compare_stream,
                                   path=output, interval=interval)

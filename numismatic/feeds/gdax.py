@@ -20,8 +20,18 @@ class GDAXWebsocketClient(WebsocketClient):
     exchange = 'GDAX'
     websocket_url = 'wss://ws-feed.gdax.com'
 
+    @staticmethod
+    def get_symbol(asset, currency):
+        return f'{asset}-{currency}'
+
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)
+            
+        # install custom get_symbol method
+        def get_symbol(asset, currency):
+            return f'{asset}-{currency}'
+        subscription.get_symbol = get_symbol
+
         # install only the subscriptions handler
         subscription.handlers = [self.__handle_subscriptions]
         channels = ['ticker'] if subscription.channel=='TRADES' else \
@@ -65,7 +75,9 @@ class GDAXWebsocketClient(WebsocketClient):
     def handle_heartbeat(msg, subscription):
         if 'type' in msg and msg['type']=='heartbeat':
             event = Heartbeat(exchange=subscription.exchange, 
-                              symbol=subscription, timestamp=timestamp)
+                              asset=subscription.asset,
+                              currency=subscription.currency,
+                              timestamp=timestamp)
             subscription.event_stream.emit(event)
             # stop processing other handlers
             return STOP_HANDLERS
@@ -74,12 +86,13 @@ class GDAXWebsocketClient(WebsocketClient):
     def handle_trade(msg, subscription):
         if 'type' in msg and msg['type']=='ticker' and 'trade_id' in msg:
             if 'product_id' in msg:
-                symbol = msg['product_id'].replace('-', '')
+                asset, currency = msg['product_id'].split('-')
             if 'time' in msg:
                 dt = datetime.strptime(msg['time'], '%Y-%m-%dT%H:%M:%S.%fZ')
                 timestamp = dt.timestamp()
             msg = Trade(exchange=subscription.exchange,
-                        symbol=symbol, 
+                        asset=asset, 
+                        currency=currency, 
                         price=msg['price'],
                         volume=msg['last_size'] if 'last_size' in msg else 0,
                         type=msg['side'].upper(),
@@ -94,10 +107,6 @@ class GDAXWebsocketClient(WebsocketClient):
 class GDAXFeed(Feed):
 
     _websocket_client_class = GDAXWebsocketClient
-        
-    @staticmethod
-    def get_symbol(asset, currency):
-        return f'{asset}-{currency}'
 
     def get_list(self):
         raise NotImplemented()

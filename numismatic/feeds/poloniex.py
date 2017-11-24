@@ -28,10 +28,19 @@ class PoloniexWebsocketClient(WebsocketClient):
     exchange = 'Poloniex'
     websocket_url = 'wss://api2.poloniex.com/'
 
+    @staticmethod
+    def get_symbol(asset, currency):
+        # Poloniex requires format USDT_<currency symbol>
+        # for USD currency.
+        currency = currency.replace('USD','USDT',1)
+        return f'{currency}_{asset}'
+
     async def _subscribe(self, subscription):
         await super()._subscribe(subscription)
+
         subscription.handlers = subscription.client._get_handlers()
-        connection_message = dict(command='subscribe', channel=subscription.symbol)
+        connection_message = dict(command='subscribe',
+                                  channel=subscription.symbol)
 
         packet = json.dumps(connection_message)
         logger.info(packet)
@@ -110,7 +119,8 @@ class PoloniexWebsocketClient(WebsocketClient):
                 for ask_price, volume in value[0].items():
                     event = Order(
                         exchange=subscription.exchange,
-                        symbol=subscription.symbol,
+                        asset=subscription.asset,
+                        currency=subscription.currency,
                         price=ask_price,
                         volume=volume,
                         type='ASK',
@@ -121,7 +131,8 @@ class PoloniexWebsocketClient(WebsocketClient):
                 for bid_price, volume in value[1].items():
                     event = Order(
                         exchange=subscription.exchange,
-                        symbol=subscription.symbol,
+                        asset=subscription.asset,
+                        currency=subscription.currency,
                         price=bid_price,
                         volume=volume,
                         type='BID',
@@ -140,14 +151,15 @@ class PoloniexWebsocketClient(WebsocketClient):
         '''
 
         event = Trade(exchange=subscription.exchange,
-                    symbol=subscription.symbol, 
-                    price=data[3],
-                    volume=data[4],
-                    type='SELL' if data[2] == 0 else 'BUY',
-                    timestamp=data[5],
-                    sequence=seq,
-                    id=data[1],
-        )
+                      asset=subscription.asset,
+                      currency=subscription.currency,
+                      price=data[3],
+                      volume=data[4],
+                      type='SELL' if data[2] == 0 else 'BUY',
+                      timestamp=data[5],
+                      sequence=seq,
+                      id=data[1],
+                      )
 
         subscription.event_stream.emit(event)
         return True
@@ -163,7 +175,8 @@ class PoloniexWebsocketClient(WebsocketClient):
         if data[3] == '0.00000000':
             event = Order(
                 exchange=subscription.exchange,
-                symbol=subscription.symbol,
+                asset=subscription.asset,
+                currency=subscription.currency,
                 price=data[2],
                 volume=data[3],
                 type='CANCEL',
@@ -174,7 +187,8 @@ class PoloniexWebsocketClient(WebsocketClient):
             # but represented as an order
             event = Order(
                 exchange=subscription.exchange,
-                symbol=subscription.symbol,
+                asset=subscription.asset,
+                currency=subscription.currency,
                 price=data[2],
                 volume=data[3],
                 type='ASK' if data[1] == 0 else 'BID',
@@ -186,13 +200,6 @@ class PoloniexWebsocketClient(WebsocketClient):
 
 class PoloniexFeed(Feed):
     _websocket_client_class = PoloniexWebsocketClient
-  
-    @staticmethod
-    def get_symbol(asset, currency):
-        # Poloniex requires format USDT_<currency symbol>
-        # for USD currency.
-        currency = currency.replace('USD','USDT',1)
-        return f'{currency}_{asset}'
 
     def get_list(self):
         raise NotImplemented()

@@ -23,16 +23,17 @@ class Event:
 
 @attr.s(slots=True)
 class Heartbeat(Event):
-    exchange = attr.ib()
-    symbol = attr.ib()
+    exchange = attr.ib(convert=str)
+    asset = attr.ib(convert=str)
+    currency = attr.ib(convert=str)
     timestamp = attr.ib(default=attr.Factory(time.time))
 
 
 @attr.s(slots=True)
 class PriceUpdate(Event):
     exchange = attr.ib(convert=str)
-    # FIXME: symbol should be split into asset and currency
-    symbol = attr.ib(convert=str)
+    asset = attr.ib(convert=str)
+    currency = attr.ib(convert=str)
     price = attr.ib(convert=float)
 
 @attr.s(slots=True)
@@ -50,18 +51,19 @@ class Trade(PriceUpdate):
     volume = attr.ib(convert=float)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
-    sequence = attr.ib(default=None)
+    sequence = attr.ib(convert=str, default=None)
     id = attr.ib(convert=str, default='')
 
 @attr.s(slots=True)
 class Order(Event):
     exchange = attr.ib(convert=str)
-    symbol = attr.ib(convert=str)
+    asset = attr.ib(convert=str)
+    currency = attr.ib(convert=str)
     price = attr.ib(convert=float, default=math.nan)
     volume = attr.ib(convert=float, default=math.nan)
     type = attr.ib(convert=OrderType, default='TRADE')
     timestamp = attr.ib(convert=float, default=attr.Factory(time.time))
-    sequence = attr.ib(default=None)
+    sequence = attr.ib(convert=str, default=None)
     id = attr.ib(convert=str, default='')
 
     @id.validator
