@@ -23,7 +23,10 @@ setup(name='numismatic',
       install_requires=REQUIREMENTS,
       python_requires='~=3.6',
       extras_require={
-        'SQL': ['sqlalchemy'],
+        'sql': ['sqlalchemy'],
+        'viz': ['pandas', 'jupyter~=1.0.0', 'bokeh~=0.12.10', 'notebook~=5.2.1',
+                'ipython~=6.2.1', 'ipywidgets~=7.0', 
+                'widgetsnbextension~=3.0.8'],
         },
       zip_safe=False,
       entry_points='''
