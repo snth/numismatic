@@ -251,7 +251,12 @@ class RestClient(abc.ABC):
     def _make_request(self, api_url, params=None, headers=None, raw=False):
         response = self.requester.get(api_url, params=params, headers=headers)
         if not raw:
-            data = response.json()
+            try:
+                data = response.json()
+            except Exception as ex:
+                logger.error(ex)
+                logger.error(response)
+                raise
         else:
             data = response
         return data
