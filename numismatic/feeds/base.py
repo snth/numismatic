@@ -53,9 +53,9 @@ class Subscription:
     def symbol(self):
         return self.client.get_symbol(self.asset, self.currency)
 
-    async def start(self):
+    def start(self):
         logger.info(f'Starting Subscription {self.topic!r} ...')
-        await self.client._subscribe(self)
+        asyncio.ensure_future(self.client._subscribe(self))
 
 @attr.s
 class Feed(abc.ABC, ConfigMixin):
@@ -182,7 +182,7 @@ class RestClient(abc.ABC):
         asyncio.ensure_future(
             self._listener(subscription, interval=interval,
                            callback=_get_raw_channel))
-        asyncio.ensure_future(subscription.start())
+        subscription.start()
         logger.info(f'Subscribed to {subscription.topic} ...')
         return subscription
 
@@ -306,7 +306,7 @@ class WebsocketClient(abc.ABC):
                                     handlers=self._get_handlers(),
                                     )
         self.subscriptions.append(subscription)
-        asyncio.ensure_future(subscription.start())
+        subscription.start()
         return subscription
 
     async def _listener(self):
