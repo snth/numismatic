@@ -110,6 +110,7 @@ class BitfinexWebsocketClient(WebsocketClient):
                         currency=subscription.currency, 
                         price=price,
                         volume=volume,
+                        type='BUY' if volume>0 else 'SELL',
                         timestamp=timestamp/1000,
                         id=trade_id)
             subscription.event_stream.emit(msg)
@@ -128,6 +129,7 @@ class BitfinexWebsocketClient(WebsocketClient):
                             currency=subscription.currency, 
                             price=price, 
                             volume=volume,
+                            type='BUY' if volume>0 else 'SELL',
                             timestamp=timestamp/1000,
                             id=trade_id)
                 subscription.event_stream.emit(msg)
