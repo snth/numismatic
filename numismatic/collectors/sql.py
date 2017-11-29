@@ -11,17 +11,16 @@ logger = logging.getLogger(__name__)
 
 try:
     import sqlalchemy
+    from sqlalchemy import create_engine, MetaData, Table, Column, Integer, \
+        Float, String
+    TYPE_MAPPING = {int:Integer, float:Float, str:String, OrderType:String}
 except ImportError:
-    logger.error('You need to have sqlalchemy installed to use the '
-                'SqlCollector. Install it with:\n'
-                '\n'
-                '   pip install sqlalchemy'
-                '\n')
-    sys.exit(1)
-
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, \
-    Float, String
-TYPE_MAPPING = {int:Integer, float:Float, str:String, OrderType:String}
+    MISSING_IMPORT_WARNING = (
+        'You need to have sqlalchemy installed to use the '
+        'SqlCollector. Install it with:\n'
+        '\n'
+        '   pip install sqlalchemy'
+        '\n')
 
 
 @attr.s
@@ -32,6 +31,9 @@ class SqlCollector(Collector):
     interval = attr.ib(default=None)
 
     def __attrs_post_init__(self):
+        if 'MISSING_IMPORT_WARNING' in globals():
+            logger.error(MISSING_IMPORT_WARNING)
+            sys.exit(1)
         engine = create_engine(self.path, echo=False)
 
         metadata = MetaData()
