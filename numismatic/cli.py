@@ -45,8 +45,9 @@ pass_state = click.make_pass_decorator(dict, ensure=True)
 @click.option('--log-level', '-l', default='info', 
               type=click.Choice(['debug', 'info', 'warning', 'error',
                                  'critical']))
+@click.option('--timeout', '-t', default=0)
 @pass_state
-def coin(state, cache_dir, requester, log_level):
+def coin(state, cache_dir, requester, log_level, timeout):
     '''Numismatic Command Line Interface
 
     Examples:
@@ -97,6 +98,37 @@ def coin(state, cache_dir, requester, log_level):
     state['output_stream'] = Stream()
     state['subscriptions'] = {}
 
+
+@coin.resultcallback()
+def run(results, cache_dir, requester, log_level, timeout):
+    """
+    Run the asyncio event loop for a set amount of time. Set to 0 to run 
+    indefinitely.  Default is no-timeout."""
+    if not timeout:
+        # Allow to run indefinitely if timeout==0
+        timeout = None
+    loop = asyncio.get_event_loop()
+    logger.debug('starting ...')
+    tasks = asyncio.Task.all_tasks()
+    try:
+        if tasks:
+            logger.info(f'Running {len(tasks)} tasks ...')
+            completed, pending = \
+                loop.run_until_complete(asyncio.wait(tasks, timeout=timeout))
+        else:
+            pass
+    except KeyboardInterrupt:
+        pass
+    finally:
+        tasks = asyncio.Task.all_tasks()
+        pending = {task for task in tasks if not task.done()}
+        if pending:
+            logger.debug('Cancelling {len(pending)) tasks ...')
+        for task in pending:
+            logger.debug(f'Cancelling pending task {id(task)} ...')
+            task.cancel()
+        logger.debug('Done')
+
 @coin.command(name='list')
 @click.option('--feed', '-f', default=config['DEFAULT']['Feed'],
               type=click.Choice(Feed._get_subclasses().keys()))
@@ -107,6 +139,7 @@ def list_all(state, feed, output):
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
     assets_list = feed_client.get_list()
+    # FIXME: This should a collector rather than write()
     write(assets_list, output, sep=' ')
 
 @coin.command()
@@ -121,6 +154,7 @@ def info(state, feed, assets, output):
     feed_client = Feed.factory(feed, cache_dir=state['cache_dir'],
                                requester=state['requester'])
     assets_info = feed_client.get_info(assets)
+    # FIXME: This should a collector rather than write()
     write(assets_info, output)
 
 
@@ -141,6 +175,7 @@ def prices(state, feed, exchange, assets, currencies, raw, output):
                                requester=state['requester'])
     prices = feed_client.get_prices(assets=assets, currencies=currencies,
                                     exchange=exchange, raw=raw)
+    # FIXME: This should a collector rather than write()
     write(prices, output)
 
 
@@ -161,6 +196,7 @@ def tickers(state, feed, exchange, assets, currencies, raw, output):
                                requester=state['requester'])
     tickers = feed_client.get_tickers(assets=assets, currencies=currencies,
                                       exchange=exchange, raw=raw)
+    # FIXME: This should a collector rather than write()
     write(tickers, output)
 
 
@@ -186,6 +222,7 @@ def history(state, feed, exchange, assets, currencies, freq, start_date,
                                            start_date=start_date,
                                            end_date=end_date, 
                                            exchange=exchange)
+    # FIXME: This should a collector rather than write()
     write(data, output)
 
 
@@ -221,6 +258,7 @@ def subscribe(state, feed, exchange, assets, currencies, interval, channels):
     subscriptions = feed_client.subscribe(assets, currencies, channels,
                                           exchange=exchange, interval=interval)
     state['subscriptions'].update(subscriptions)
+    return subscriptions
 
 
 @coin.command()
@@ -257,6 +295,7 @@ def collect(state, market, stream, collector, filter, type, output, format, inte
     collector = Collector.factory(collector_name, event_stream=collect_stream,
                                   path=output, format=format, types=type,
                                   filters=filter, interval=interval)
+    return collector
 
 
 @coin.command()
@@ -275,44 +314,13 @@ def compare(state, collector, output, interval):
     collector_name = collector
     collector = Collector.factory(collector_name, event_stream=compare_stream,
                                   path=output, interval=interval)
-
-
-@coin.command()
-@click.option('--timeout', '-t', default=0)
-@pass_state
-def run(state, timeout):
-    """
-    Run the asyncio event loop for a set amount of time. Set to 0 to run 
-    indefinitely.  Default is no-timeout."""
-    if not timeout:
-        # Allow to run indefinitely if timeout==0
-        timeout = None
-    loop = asyncio.get_event_loop()
-    logger.debug('starting ...')
-    tasks = asyncio.Task.all_tasks()
-    try:
-        if tasks:
-            logger.info(f'Running {len(tasks)} tasks ...')
-            completed, pending = \
-                loop.run_until_complete(asyncio.wait(tasks, timeout=timeout))
-        else:
-            logger.info(f'Running forever ...')
-            loop.run_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        logger.debug('Cancelling ...')
-        tasks = asyncio.Task.all_tasks()
-        pending = {task for task in tasks if not task.done()}
-        for task in pending:
-            logger.debug(f'Cancelling pending task {id(task)} ...')
-            task.cancel()
-        logger.debug('Done')
+    return collector
 
 
 def write(data, file, sep='\n'):
     for record in data:
         file.write(str(record)+sep)
+    file.write('\n')
 
 
 if __name__ == '__main__':
