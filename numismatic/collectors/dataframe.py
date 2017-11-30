@@ -3,7 +3,6 @@ import sys
 from functools import partial
 
 import attr
-from streamz.dataframe import StreamingDataFrame
 
 from .base import Collector
 from ..events import OrderType, Trade, Order
@@ -12,26 +11,30 @@ logger = logging.getLogger(__name__)
 
 try:
     import pandas as pd
+    from streamz.dataframe import StreamingDataFrame
 except ImportError:
-    logger.error('You need to have pandas installed to use the '
-                'DataFrameCollector. Install it with:\n'
-                '\n'
-                '   pip install pandas\n'
-                'or\n'
-                '   pip install numismatic[dataframe]\n')
-    sys.exit(1)
+    MISSING_IMPORT_WARNING = (
+        'The DataFrameCollector is an optional component with extra '
+        'dependencies. \n'
+        'Install them with:\n'
+        '\n'
+        '   pip install numismatic[DataFrameCollector]'
+        '\n')
 
 TYPE_MAPPING = {int:int, float:float, str:str, OrderType:str}
 
 
 @attr.s
-class DataframeCollector(Collector):
+class DataFrameCollector(Collector):
 
     path = attr.ib(default='-')
     format = attr.ib(default='json')
     interval = attr.ib(default=None)
 
     def __attrs_post_init__(self):
+        if 'MISSING_IMPORT_WARNING' in globals():
+            logger.error(MISSING_IMPORT_WARNING)
+            sys.exit(1)
         # paths
         if self.path=='-':
             self._opener = lambda: sys.stdout

@@ -1,7 +1,7 @@
 from .base import Collector
 from .file import FileCollector
 from .sql import SqlCollector
-from .dataframe import DataframeCollector
+from .dataframe import DataFrameCollector
 
 from ..libs.utils import make_get_subclasses, subclass_factory
 

@@ -16,10 +16,10 @@ try:
     TYPE_MAPPING = {int:Integer, float:Float, str:String, OrderType:String}
 except ImportError:
     MISSING_IMPORT_WARNING = (
-        'You need to have sqlalchemy installed to use the '
-        'SqlCollector. Install it with:\n'
+        'The SqlCollector is an optional component with extra dependencies. \n'
+        'Install them with:\n'
         '\n'
-        '   pip install sqlalchemy'
+        '   pip install numismatic[SqlCollector]'
         '\n')
 
 
