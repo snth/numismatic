@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 try:
     import pandas as pd
-    from streamz.dataframe import StreamingDataFrame
-except ImportError:
+    from streamz.dataframe import DataFrame
+except ImportError as ex:
+    logger.warning(ex)
     MISSING_IMPORT_WARNING = (
         'The DataFrameCollector is an optional component with extra '
         'dependencies. \n'
@@ -32,6 +33,7 @@ class DataFrameCollector(Collector):
     interval = attr.ib(default=None)
 
     def __attrs_post_init__(self):
+        super().__attrs_post_init__()
         if 'MISSING_IMPORT_WARNING' in globals():
             logger.error(MISSING_IMPORT_WARNING)
             sys.exit(1)
@@ -78,8 +80,8 @@ class DataFrameCollector(Collector):
                     columns=events_dataframe.columns)
         )
 
-        # create a StreamingDataFrame
-        sdf = StreamingDataFrame(df_stream, example=events_dataframe)
+        # create a DataFrame
+        sdf = DataFrame(df_stream, example=events_dataframe)
 
         sdf.stream.sink(self.write)
 
