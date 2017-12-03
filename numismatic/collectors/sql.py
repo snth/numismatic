@@ -31,6 +31,7 @@ class SqlCollector(Collector):
     interval = attr.ib(default=None)
 
     def __attrs_post_init__(self):
+        super().__attrs_post_init__()
         if 'MISSING_IMPORT_WARNING' in globals():
             logger.error(MISSING_IMPORT_WARNING)
             sys.exit(1)
