@@ -3,4 +3,4 @@ WORKDIR /usr/src/app
 COPY ./ /usr/src/app
 RUN pip install -e .
 WORKDIR numismatic
-CMD coin list
+CMD coin
