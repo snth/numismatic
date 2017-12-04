@@ -25,9 +25,14 @@ class Requester:
     "Basic Requester using requests and blocking calls"
 
     retries = attr.ib(default=attr.Factory(
-        config_item_getter('REQUESTER', 'retries')))
+        config_item_getter('REQUESTER', 'retries')),
+        convert=int)
+    timeout = attr.ib(default=attr.Factory(
+        config_item_getter('REQUESTER', 'timeout')),
+        convert=int)
     backoff_factor = attr.ib(default=attr.Factory(
-        config_item_getter('REQUESTER', 'backoff_factor')))
+        config_item_getter('REQUESTER', 'backoff_factor')),
+        convert=float)
     status_forcelist = attr.ib(default=attr.Factory(
         config_item_getter('REQUESTER', 'status_forcelist')),
         convert=lambda val: tuple(map(int, val.split(','))),
@@ -59,7 +64,7 @@ class Requester:
         adapter = HTTPAdapter(max_retries=retry)
         session.mount('http://', adapter)
         session.mount('https://', adapter)
-        response = session.get(url, params=params, headers=headers)
+        response = session.get(url, params=params, headers=headers, timeout=self.timeout)
         return response
 
 
