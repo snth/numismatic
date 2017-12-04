@@ -249,7 +249,12 @@ class RestClient(abc.ABC):
             raise ValueError(f'{attribute.name}: {value}')
 
     def _make_request(self, api_url, params=None, headers=None, raw=False):
-        response = self.requester.get(api_url, params=params, headers=headers)
+        try:
+            response = self.requester.get(api_url, params=params, headers=headers)
+        except Exception as ex:
+            logger.error(ex)
+            logger.error(packet)
+            raise ex
         if not raw:
             data = response.json()
         else:
