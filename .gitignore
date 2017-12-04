@@ -10,3 +10,4 @@ dist/
 venv/
 venv-numismatic/
 data/
+docs/build
