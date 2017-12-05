@@ -3,10 +3,10 @@ Numismatic
 Numismatic is tool for querying crypto coin exchanges on the command line. Numismatic
 has the following design goals:
 
- 1 **Extensible**
- 2 **Websocket first** (however rest is fully supported)
- 3 **Standardized outputs**
- 4 **Simple cli**
+1. **Extensible**
+2. **Websocket first** (however rest is fully supported)
+3. **Standardized outputs**
+4. **Simple cli**
 
 Quick Start
 -----------
