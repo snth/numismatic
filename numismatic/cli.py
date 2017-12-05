@@ -74,23 +74,23 @@ def coin(state, cache_dir, requester, log_level, timeout):
 
         coin history -a ETH -c BTC -o ETH-BTH-history.json
 
-        coin subscribe collect run
+        coin subscribe collect 
 
-        coin subscribe -a BTC,ETH,XMR,ZEC collect -t Trade run -t 30
+        coin -t 30 subscribe -a BTC,ETH,XMR,ZEC collect -t Trade 
 
-        coin subscribe -f bitfinex -f gdax collect run
+        coin subscribe -f bitfinex -f gdax collect
 
-        coin subscribe -f bitfinex -f gdax collect --raw run
+        coin subscribe -f bitfinex -f gdax collect --raw
 
-        coin subscribe -f cryptocompare collect run
+        coin subscribe -f cryptocompare collect
 
-        coin subscribe -f cryptocompare -e kraken collect run
+        coin subscribe -f cryptocompare -e kraken collect
 
-        coin subscribe -f bitfinex -f gdax compare run
+        coin subscribe -f bitfinex -f gdax compare
 
         coin sub -f cryptocompare -C tickers -e cexio sub -f \\
             cryptocompare -C prices -e kraken sub -f bitfinex sub -f gdax \\
-            sub -f poloniex compare run
+            sub -f poloniex compare
     '''
     logging.basicConfig(level=getattr(logging, log_level.upper()))
     state['cache_dir'] = cache_dir
