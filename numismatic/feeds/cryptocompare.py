@@ -137,14 +137,17 @@ class CryptoCompareFeed(Feed):
                    **kwargs):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
+        exchange = exchange if exchange else self.rest_client.exchange
         # FIXME: SHouldn't use caching
         data = self.rest_client.get_price_multi(fsyms=assets, tsyms=currencies,
                                                 e=exchange)
-        exchange = exchange if exchange else self.rest_client.exchange
-        prices = [{'exchange':exchange, 'asset':asset, 'currency':currency,
-                   'price':price, }
-                  for asset, asset_prices in data.items()
-                  for currency, price in asset_prices.items()]
+        if data:
+            prices = [{'exchange':exchange, 'asset':asset, 'currency':currency,
+                       'price':price, }
+                      for asset, asset_prices in data.items()
+                      for currency, price in asset_prices.items()]
+        else:
+            prices = []
         if not raw:
             prices = [self.rest_client.parse_price(msg) for msg in prices]
         return prices
@@ -157,9 +160,12 @@ class CryptoCompareFeed(Feed):
         data = self.rest_client.get_price_multi_full(fsyms=assets,
                                                      tsyms=currencies,
                                                      e=exchange)
-        tickers = [msg if raw else self.rest_client.parse_ticker(msg)
-                  for asset, asset_updates in data['RAW'].items()
-                  for currency, msg in asset_updates.items()]
+        if data:
+            tickers = [msg if raw else self.rest_client.parse_ticker(msg)
+                       for asset, asset_updates in data['RAW'].items()
+                       for currency, msg in asset_updates.items()]
+        else:
+            tickers = []
         return tickers
 
     def get_historical_data(self, assets, currencies, freq='d', end_date=None,
