@@ -201,13 +201,13 @@ class PoloniexWebsocketClient(WebsocketClient):
 class PoloniexFeed(Feed):
     _websocket_client_class = PoloniexWebsocketClient
 
-    def get_list(self):
+    def get_list(self, **kwargs):
         raise NotImplemented()
 
-    def get_info(self, assets):
+    def get_info(self, assets, **kwargs):
         raise NotImplemented()
 
-    def get_prices(self, assets, currencies):
+    def get_prices(self, assets, currencies, **kwargs):
         raise NotImplemented() 
     
     def get_tickers(self, assets, currencies, raw=False):

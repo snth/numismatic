@@ -40,17 +40,17 @@ class BraveNewCoinFeed(Feed):
 
     _rest_client_class = BraveNewCoinRestClient
 
-    def get_list(self): 
+    def get_list(self, **kwargs): 
         digital_currencies = self.rest_client.get_digital_currency_symbols()
         response = [key 
                     for json_dict in digital_currencies
                     for key, value in json_dict.items()]
         return response
 
-    def get_info(self, assets):
+    def get_info(self, assets, **kwargs):
         raise NotImplementedError('Not available for this feed.') 
 
-    def get_prices(self, assets, currencies):
+    def get_prices(self, assets, currencies, **kwargs):
         '''Latest prices for assets in given currencies
         
         Not the most efficient method as BNC does not

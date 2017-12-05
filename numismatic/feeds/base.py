@@ -82,19 +82,19 @@ class Feed(abc.ABC, ConfigMixin):
             else self._websocket_client_class()
 
     @abc.abstractmethod
-    def get_list(self):
+    def get_list(self, **kwargs):
         return
 
     @abc.abstractmethod
-    def get_info(self, assets):
+    def get_info(self, assets, **kwargs):
         return
 
     @abc.abstractmethod
-    def get_prices(self, assets, currencies, raw=False):
+    def get_prices(self, assets, currencies, raw=False, **kwargs):
         return
 
     @abc.abstractmethod
-    def get_tickers(self, assets, currencies, raw=False):
+    def get_tickers(self, assets, currencies, raw=False, **kwargs):
         return
 
     def subscribe(self, assets, currencies, channels, exchange=None,

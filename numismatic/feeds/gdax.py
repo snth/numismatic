@@ -108,16 +108,16 @@ class GDAXFeed(Feed):
 
     _websocket_client_class = GDAXWebsocketClient
 
-    def get_list(self):
+    def get_list(self, **kwargs):
         raise NotImplemented()
 
-    def get_info(self, assets):
+    def get_info(self, assets, **kwargs):
         raise NotImplemented()
  
-    def get_prices(self, assets, currencies):
+    def get_prices(self, assets, currencies, **kwargs):
         raise NotImplemented()       
  
-    def get_tickers(self, assets, currencies):
+    def get_tickers(self, assets, currencies, **kwargs):
         raise NotImplemented()       
 
 

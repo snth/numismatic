@@ -123,17 +123,18 @@ class CryptoCompareFeed(Feed):
     _interval_limit = 2000
     _rest_client_class = CryptoCompareRestClient
 
-    def get_list(self):
+    def get_list(self, **kwargs):
         return self.rest_client.get_coinlist()
         return coinlist.keys()
 
-    def get_info(self, assets):
+    def get_info(self, assets, **kwargs):
         assets = self._validate_parameter('assets', assets)
         coinlist = self.rest_client.get_coinlist()
         assets_info = [coinlist[a] for a in assets]
         return assets_info
 
-    def get_prices(self, assets, currencies, exchange=None, raw=False):
+    def get_prices(self, assets, currencies, raw=False, exchange=None,
+                   **kwargs):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         # FIXME: SHouldn't use caching
@@ -148,7 +149,8 @@ class CryptoCompareFeed(Feed):
             prices = [self.rest_client.parse_price(msg) for msg in prices]
         return prices
 
-    def get_tickers(self, assets, currencies, exchange=None, raw=False):
+    def get_tickers(self, assets, currencies, raw=False, exchange=None,
+                    **kwargs):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         # FIXME: SHouldn't use caching

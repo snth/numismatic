@@ -147,14 +147,14 @@ class LunoFeed(Feed):
     _rest_client_class = LunoRestClient
     _websocket_client_class = LunoWebsocketClient
 
-    def get_list(self):
+    def get_list(self, **kwargs):
         tickers = self.rest_client.get_tickers()
         return [ticker['pair'] for ticker in tickers]
 
-    def get_info(self, assets):
+    def get_info(self, assets, **kwargs):
         raise NotImplementedError('Not available for this feed.') 
 
-    def get_prices(self, assets, currencies):
+    def get_prices(self, assets, currencies, **kwargs):
         assets = self._validate_parameter('assets', assets)
         currencies = self._validate_parameter('currencies', currencies)
         tickers = self.rest_client.get_tickers()
@@ -162,7 +162,7 @@ class LunoFeed(Feed):
                  product(assets, currencies)}
         return [ticker for ticker in tickers if ticker['pair'] in pairs]
  
-    def get_tickers(self, assets, currencies):
+    def get_tickers(self, assets, currencies, **kwargs):
         raise NotImplemented()       
 
     def _subscribe(self, asset, currency, channel, exchange=None, 
