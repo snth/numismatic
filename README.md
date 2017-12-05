@@ -26,9 +26,9 @@ Run the `coin` script from anywhere and explore from there
 
     coin prices -a BTC,ETH,XMR,ZEC
 
-    coin subscribe -a BTC,ETH,XMR,ZEC collect run
+    coin subscribe -a BTC,ETH,XMR,ZEC collect
 
-    coin subscribe -e bitfinex -e gdax collect -t Trade run
+    coin subscribe -f bitfinex -f gdax compare
 
 ## Contribute
 
