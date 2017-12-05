@@ -1,2 +1,1 @@
-How To Contribute
-=================
+.. include:: ../../CONTRIBUTING.rst
