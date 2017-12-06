@@ -1,5 +1,7 @@
 import logging
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 import time
 from pathlib import Path
 from functools import partial
@@ -9,6 +11,7 @@ import pickle
 
 import attr
 from appdirs import user_cache_dir
+from .config import config_item_getter
 
 
 log = logging.getLogger(__name__)
@@ -20,6 +23,20 @@ LIBRARY_NAME = 'numismatic'
 @attr.s
 class Requester:
     "Basic Requester using requests and blocking calls"
+
+    retries = attr.ib(default=attr.Factory(
+        config_item_getter('REQUESTER', 'retries')),
+        convert=int)
+    timeout = attr.ib(default=attr.Factory(
+        config_item_getter('REQUESTER', 'timeout')),
+        convert=int)
+    backoff_factor = attr.ib(default=attr.Factory(
+        config_item_getter('REQUESTER', 'backoff_factor')),
+        convert=float)
+    status_forcelist = attr.ib(default=attr.Factory(
+        config_item_getter('REQUESTER', 'status_forcelist')),
+        convert=lambda val: tuple(map(int, val.split(','))),
+        validator=attr.validators.instance_of(tuple))
 
     @classmethod
     def factory(cls, requester, **kwargs):
@@ -36,7 +53,18 @@ class Requester:
         return subcls(**kwds)
 
     def get(self, url, params=None, headers=None):
-        response = requests.get(url, params=params, headers=headers)
+        session = requests.Session()
+        retry = Retry(
+            total=self.retries,
+            read=self.retries,
+            connect=self.retries,
+            backoff_factor=self.backoff_factor,
+            status_forcelist=self.status_forcelist,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+        response = session.get(url, params=params, headers=headers, timeout=self.timeout)
         return response
 
 
