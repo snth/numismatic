@@ -1,21 +1,11 @@
 How To Contribute
 =================
 
-First off, thank you for considering contributing to ``attrs``!
+First off, thank you for considering contributing to ``Numismatic``!
 It's people like *you* who make it is such a great tool for everyone.
 
 This document is mainly to help you to get started by codifying tribal knowledge and expectations and make it more accessible to everyone.
 But don't be afraid to open half-finished PRs and ask questions if something is unclear!
-
-
-Support
--------
-
-In case you'd like to help out but don't want to deal with GitHub, there's a great opportunity:
-help your fellow developers on `StackOverflow <https://stackoverflow.com/questions/tagged/python-attrs>`_!
-
-The offical tag is ``python-attrs`` and helping out in support frees us up for improving ``attrs`` instead!
-
 
 Workflow
 --------
@@ -144,47 +134,12 @@ or:
 Local Development Environment
 -----------------------------
 
-You can (and should) run our test suite using tox_.
-However you’ll probably want a more traditional environment too.
-We highly recommend to develop using the latest Python 3 release because ``attrs`` tries to take advantage of modern features whenever possible.
-
-First create a `virtual environment <https://virtualenv.pypa.io/>`_.
-It’s out of scope for this document to list all the ways to manage virtual environments in Python but if you don’t have already a pet way, take some time to look at tools like `pew <https://github.com/berdario/pew>`_, `virtualfish <http://virtualfish.readthedocs.io/>`_, and `virtualenvwrapper <http://virtualenvwrapper.readthedocs.io/>`_.
-
-Next get an up to date checkout of the ``attrs`` repository:
-
-.. code-block:: bash
-
-    git checkout git@github.com:python-attrs/attrs.git
-
-Change into the newly created directory and **after activating your virtual environment** install an editable version of ``attrs``:
-
-.. code-block:: bash
-
-    cd attrs
-    pip install -e .
-
-If you run the virtual environment’s Python and try to ``import attr`` it should work!
-
-To run the test suite, you'll need our development dependencies which can be installed using
-
-.. code-block:: bash
-
-    pip install -r dev-requirements.txt
-
-At this point
-
-.. code-block:: bash
-
-   python -m pytest
-
-should work and pass!
 
 
 Governance
 ----------
 
-``attrs`` is maintained by `team of volunteers`_ that is always open for new members that share our vision of a fast, lean, and magic-free library that empowers programmers to write better code with less effort.
+``Numismatic`` is maintained by `team of volunteers`_ that is always open for new members that share our vision of a fast, lean, and magic-free library that empowers programmers to write better code with less effort.
 If you'd like to join, just get a pull request merged and ask to be added in the very same pull request!
 
 **The simple rule is that everyone is welcome to review/merge pull requests of others but nobody is allowed to merge their own code.**
@@ -198,4 +153,4 @@ Please note that this project is released with a Contributor `Code of Conduct`_.
 By participating in this project you agree to abide by its terms.
 Please report any harm to `Hynek Schlawack`_ in any way you find appropriate.
 
-Thank you for considering contributing to ``attrs``!
+Thank you for considering contributing to ``Numismatic``!
