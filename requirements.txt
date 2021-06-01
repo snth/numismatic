@@ -11,6 +11,6 @@ six==1.11.0
 streamz==0.2.0
 toolz==0.8.2
 tornado==4.5.2
-urllib3==1.22
+urllib3==1.26.5
 websockets==3.4
 zict==0.1.3
